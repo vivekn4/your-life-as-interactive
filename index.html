@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Your Life As: Interactive — VN</title>
+<meta name="description" content="Playable cinematic life stories. Your choices. Multiple endings.">
+<style>
+:root{
+  --gold:#f5c518; --gold-dim:#8a6d0b; --violet:#a78bfa; --red:#f87171;
+  --ink:#0a0a0f; --paper:#f3ead8; --muted:#9a917f;
+  --serif:Georgia,'Times New Roman',serif; --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--ink);color:var(--paper);font-family:var(--sans);min-height:100%}
+body{overflow-x:hidden}
+#fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;
+  background-image:repeating-conic-gradient(#fff 0 .0001%,transparent 0 .0002%);background-size:3px 3px}
+.screen{position:relative;z-index:2;display:none;min-height:100vh;max-width:860px;margin:0 auto;padding:24px 20px 80px}
+.screen.active{display:block;animation:fadeUp .6s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.hero{text-align:center;padding:48px 0 8px}
+.hero .kicker{letter-spacing:.5em;color:var(--gold);font-size:12px;text-transform:uppercase}
+.hero h1{font-family:var(--serif);font-size:clamp(42px,9vw,84px);margin:12px 0 4px;letter-spacing:.04em;
+  background:linear-gradient(180deg,#fff6d8,var(--gold) 60%,#7a5c06);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 60px rgba(245,197,24,.25)}
+.hero h1 .thin{font-weight:400;font-style:italic}
+.hero .sub{color:var(--muted);font-size:15px;max-width:560px;margin:10px auto 0;line-height:1.6}
+.vn-tag{display:inline-block;margin-top:14px;padding:5px 14px;border:1px solid var(--gold-dim);color:var(--gold);
+  font-size:11px;letter-spacing:.35em;border-radius:999px}
+.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:34px 0}
+.scenario-card{background:linear-gradient(160deg,#14141c,#0d0d13);border:1px solid #2a2a35;border-radius:14px;
+  padding:22px;cursor:pointer;transition:transform .2s,border-color .2s,box-shadow .2s;position:relative;overflow:hidden}
+.scenario-card:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 12px 40px rgba(245,197,24,.15)}
+.scenario-card .icon{font-size:40px}
+.scenario-card h3{font-family:var(--serif);font-size:21px;margin:12px 0 6px;color:#fff}
+.scenario-card p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0 0 10px}
+.scenario-card .ends{font-size:11px;letter-spacing:.2em;color:var(--gold-dim);text-transform:uppercase}
+.panel{background:#101018;border:1px solid #26262f;border-radius:14px;padding:20px;margin:18px 0}
+.panel h2{font-size:13px;letter-spacing:.35em;color:var(--gold);margin:0 0 12px;text-transform:uppercase}
+.gallery-row{display:flex;gap:10px;flex-wrap:wrap}
+.end-chip{padding:8px 12px;border-radius:999px;font-size:12px;border:1px solid #333;background:#15151d;color:var(--muted)}
+.end-chip.got.gold{border-color:var(--gold);color:var(--gold)}
+.end-chip.got.violet{border-color:var(--violet);color:var(--violet)}
+.end-chip.got.red{border-color:var(--red);color:var(--red)}
+.controls-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:8px}
+.btn{background:linear-gradient(180deg,#1d1d26,#121218);border:1px solid #3a3a44;color:var(--paper);
+  padding:12px 22px;border-radius:10px;font-size:14px;cursor:pointer;letter-spacing:.06em;transition:all .18s;font-family:var(--sans)}
+.btn:hover{border-color:var(--gold);box-shadow:0 0 18px rgba(245,197,24,.25);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(180deg,#f5c518,#b78d0a);color:#141005;font-weight:700;border:none}
+.btn.danger{border-color:#5a2626;color:var(--red)}
+.btn:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
+.toggle{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--paper);cursor:pointer;user-select:none}
+.toggle .pill{width:46px;height:24px;border-radius:999px;background:#2a2a35;position:relative;transition:background .2s;border:1px solid #444}
+.toggle.on .pill{background:var(--gold)}
+.toggle .pill::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.on .pill::after{left:24px}
+#ai-status{font-size:12px;color:var(--muted)}
+/* ---- game screen ---- */
+.chapter-card{text-align:center;padding:26px 0 6px}
+#chapter-kicker{font-size:11px;letter-spacing:.5em;color:var(--gold);text-transform:uppercase}
+#chapter-title{font-family:var(--serif);font-size:clamp(28px,6vw,46px);margin:8px 0 0;color:#fff;font-style:italic}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}
+.stat{background:#101018;border:1px solid #26262f;border-radius:10px;padding:10px}
+.stat .lbl{font-size:10px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
+.stat .num{color:var(--gold);font-weight:700}
+.stat .bar{height:6px;background:#22222b;border-radius:99px;margin-top:8px;overflow:hidden}
+.stat .fill{height:100%;width:50%;border-radius:99px;background:linear-gradient(90deg,var(--gold-dim),var(--gold));transition:width .8s ease}
+#narration{font-family:var(--serif);font-size:clamp(17px,2.6vw,21px);line-height:1.85;color:#efe6cf;
+  background:rgba(16,16,24,.72);border-left:3px solid var(--gold);padding:22px 24px;border-radius:0 12px 12px 0;margin:18px 0}
+#narration p{margin:0 0 1em}#narration p:last-child{margin:0}
+#vignette{font-family:var(--serif);font-style:italic;color:var(--gold);opacity:.9;font-size:16px;line-height:1.7;
+  text-align:center;margin:6px auto 4px;max-width:640px;min-height:1.2em}
+#vignette .ai-badge{font-style:normal;font-size:10px;letter-spacing:.25em;border:1px solid var(--gold-dim);
+  border-radius:99px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+#choice-lead{color:#fff;font-size:15px;margin:22px 0 4px;font-weight:600}
+#choices{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.choice{background:linear-gradient(160deg,#17171f,#0f0f15);border:1px solid #34343e;border-radius:12px;
+  padding:16px 18px;color:var(--paper);font-size:15.5px;line-height:1.5;text-align:left;cursor:pointer;
+  transition:all .18s;width:100%;font-family:var(--sans)}
+.choice:hover:not(:disabled){border-color:var(--gold);background:linear-gradient(160deg,#1e1a10,#12100a);
+  box-shadow:0 6px 24px rgba(245,197,24,.18);transform:translateX(6px)}
+.choice:disabled{opacity:.45;cursor:not-allowed}
+.choice .lock{font-size:12px;color:var(--red);display:block;margin-top:6px}
+#deltas{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0;min-height:30px}
+.delta{font-size:13px;font-weight:700;padding:5px 12px;border-radius:99px;animation:pop .5s ease}
+.delta.up{color:#0d0d12;background:#7ee2a8}.delta.down{color:#fff;background:#e26d6d}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+#result-box{display:none;background:#101018;border:1px solid var(--gold-dim);border-radius:12px;padding:20px;margin:16px 0}
+#result-box.show{display:block;animation:fadeUp .5s ease}
+#result-text{font-family:var(--serif);font-size:16.5px;line-height:1.8;color:#efe6cf}
+#btn-continue{margin-top:14px}
+.game-bar{display:flex;gap:10px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+#save-note{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;letter-spacing:.1em}
+/* event modal */
+#event-modal{display:none;position:fixed;inset:0;z-index:10;background:rgba(5,5,10,.82);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:20px}
+#event-modal.show{display:flex}
+.event-card{max-width:560px;background:linear-gradient(160deg,#1a1a24,#0e0e14);border:1px solid var(--violet);
+  border-radius:16px;padding:28px;box-shadow:0 0 60px rgba(167,139,250,.25);animation:fadeUp .4s ease}
+.event-card .ek{font-size:11px;letter-spacing:.4em;color:var(--violet);text-transform:uppercase}
+.event-card h3{font-family:var(--serif);color:#fff;margin:10px 0}
+#event-text{color:#d8d2c2;line-height:1.75;font-size:15.5px}
+#event-options{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+/* ending */
+#ending-screen{text-align:center}
+#ending-rank{display:inline-block;font-size:13px;letter-spacing:.5em;padding:10px 26px;border-radius:999px;margin:30px 0 6px;text-transform:uppercase;font-weight:700}
+#ending-rank.gold{background:rgba(245,197,24,.14);border:1px solid var(--gold);color:var(--gold);box-shadow:0 0 40px rgba(245,197,24,.3)}
+#ending-rank.violet{background:rgba(167,139,250,.12);border:1px solid var(--violet);color:var(--violet);box-shadow:0 0 40px rgba(167,139,250,.3)}
+#ending-rank.red{background:rgba(248,113,113,.12);border:1px solid var(--red);color:var(--red);box-shadow:0 0 40px rgba(248,113,113,.3)}
+#ending-title{font-family:var(--serif);font-size:clamp(30px,7vw,54px);color:#fff;margin:10px 0;font-style:italic}
+#ending-text{font-family:var(--serif);font-size:17.5px;line-height:1.9;color:#e9e0c9;max-width:680px;margin:18px auto;text-align:left;
+  background:rgba(16,16,24,.72);padding:26px;border-radius:12px;border:1px solid #2c2c36}
+#ending-coda{font-family:var(--serif);font-style:italic;color:var(--gold);max-width:640px;margin:14px auto;line-height:1.7}
+#ending-stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);z-index:50;
+  background:#1c1c26;border:1px solid var(--gold);color:var(--paper);padding:12px 24px;border-radius:99px;
+  font-size:14px;transition:transform .35s ease;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0)}
+.flash{position:fixed;inset:0;z-index:5;pointer-events:none;background:#fff;opacity:0}
+.menu-foot{text-align:center;color:var(--muted);font-size:12px;margin-top:40px;letter-spacing:.15em}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}#narration{padding:18px}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="vignette"></div>
+<div class="grain"></div>
+<div class="flash" id="flash"></div>
+
+<!-- ============ MENU ============ -->
+<div class="screen active" id="menu-screen">
+  <div class="hero">
+    <div class="kicker">A cinematic life-sim</div>
+    <h1>YOUR LIFE AS<br><span class="thin">Interactive</span></h1>
+    <p class="sub">Step inside the story. Every choice bends the current of your life — and no two lives end the same way. Three lives. Fifteen fates. Yours to live.</p>
+    <div class="vn-tag">✦ VN ✦</div>
+  </div>
+  <div class="scenario-grid" id="scenario-list"></div>
+  <div class="panel">
+    <h2>Endings Gallery</h2>
+    <div class="gallery-row" id="gallery"></div>
+  </div>
+  <div class="panel">
+    <h2>Storyteller</h2>
+    <div class="controls-row">
+      <div class="toggle" id="ai-toggle" role="switch" aria-checked="false" tabindex="0">
+        <div class="pill"></div><span>AI Storyteller</span>
+      </div>
+      <span id="ai-status">off — hand-written prose</span>
+    </div>
+    <p class="sub" style="font-size:12.5px;color:var(--muted);margin:10px 0 0">When on, an AI narrator weaves one-line vignettes from <i>your actual choices</i>. The story itself never changes — only the poetry around it. Free, no account, falls back silently if offline.</p>
+  </div>
+  <div class="controls-row">
+    <button class="btn" id="mute-btn">🔊 Sound on</button>
+    <button class="btn danger" id="reset-saves">Reset all progress</button>
+  </div>
+  <div class="menu-foot">A VN ORIGINAL · YOUR LIFE AS: INTERACTIVE · v1.0</div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div class="screen" id="game-screen">
+  <div class="chapter-card">
+    <div id="chapter-kicker">Chapter I</div>
+    <h2 id="chapter-title">Cold Open</h2>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="lbl"><span>❤ Health</span><span class="num" id="num-health">50</span></div><div class="bar"><div class="fill" id="fill-health"></div></div></div>
+    <div class="stat"><div class="lbl"><span>⚡ Nerve</span><span class="num" id="num-nerve">50</span></div><div class="bar"><div class="fill" id="fill-nerve"></div></div></div>
+    <div class="stat"><div class="lbl"><span>🤝 Allies</span><span class="num" id="num-allies">50</span></div><div class="bar"><div class="fill" id="fill-allies"></div></div></div>
+    <div class="stat"><div class="lbl"><span>💰 Fortune</span><span class="num" id="num-fortune">50</span></div><div class="bar"><div class="fill" id="fill-fortune"></div></div></div>
+  </div>
+  <div id="narration"></div>
+  <div id="vignette"></div>
+  <div id="choice-lead"></div>
+  <div id="choices"></div>
+  <div id="deltas"></div>
+  <div id="result-box"><div id="result-text"></div><button class="btn primary" id="btn-continue">Continue →</button></div>
+  <div class="game-bar">
+    <button class="btn" id="btn-restart">↺ Restart life</button>
+    <button class="btn" id="btn-quit">💾 Save &amp; quit</button>
+  </div>
+  <div id="save-note">progress auto-saves after every choice</div>
+</div>
+
+<!-- ============ ENDING ============ -->
+<div class="screen" id="ending-screen">
+  <div id="ending-rank" class="gold">Triumphant</div>
+  <h2 id="ending-title"></h2>
+  <div id="ending-text"></div>
+  <div id="ending-coda"></div>
+  <div id="ending-stats"></div>
+  <div class="controls-row">
+    <button class="btn primary" id="btn-again">↺ Live it again</button>
+    <button class="btn" id="btn-menu">Choose another life</button>
+  </div>
+</div>
+
+<div id="event-modal">
+  <div class="event-card">
+    <div class="ek">⚡ Life happens</div>
+    <h3 id="event-title">Twist of fate</h3>
+    <div id="event-text"></div>
+    <div id="event-options"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================================================================
+   YOUR LIFE AS: INTERACTIVE — a VN original
+   Branching cinematic life-sim. Vanilla JS, zero dependencies.
+   ================================================================ */
+
+// ---------- utils ----------
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const rnd = arr => arr[Math.floor(Math.random()*arr.length)];
+const ROMAN = ['I','II','III','IV','V'];
+const STAT_KEYS = ['health','nerve','allies','fortune'];
+const STAT_LABEL = {health:'Health',nerve:'Nerve',allies:'Allies',fortune:'Fortune'};
+const STAT_ICON = {health:'❤',nerve:'⚡',allies:'🤝',fortune:'💰'};
+
+function toast(msg, ms=2600){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+// ---------- storage ----------
+const LS_SAVE='yla_interactive_save_v1', LS_END='yla_interactive_endings_v1', LS_SET='yla_interactive_settings_v1';
+const store = {
+  get(k, fb){ try{ const v = localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+// ---------- audio (all synthesized, zero files) ----------
+const AudioSys = {
+  ctx:null, muted: store.get(LS_SET,{}).muted===true, ambNodes:[],
+  ensure(){
+    if(this.ctx || this.muted) return;
+    try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  },
+  tone(freq, dur=0.15, type='sine', vol=0.12, when=0, slideTo=null){
+    if(this.muted) return; this.ensure(); if(!this.ctx) return;
+    try{
+    const t0 = this.ctx.currentTime + when;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if(slideTo) o.frequency.exponentialRampToValue(slideTo, t0+dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValue(vol, t0+0.015);
+    g.gain.exponentialRampToValue(0.0001, t0+dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0+dur+0.05);
+    }catch(e){}
+  },
+  noise(dur=0.5, vol=0.08, fFrom=400, fTo=4000){
+    if(this.muted) return; this.ensure(); if(!this.ctx) return;
+    try{
+    const t0 = this.ctx.currentTime, len = Math.floor(this.ctx.sampleRate*dur);
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*(1-i/len);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=1.2;
+    f.frequency.setValueAtTime(fFrom, t0); f.frequency.exponentialRampToValue(fTo, t0+dur);
+    const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValue(0.0001, t0+dur);
+    src.connect(f); f.connect(g); g.connect(this.ctx.destination); src.start(t0);
+    }catch(e){}
+  },
+  click(){ this.tone(660,0.07,'triangle',0.08); },
+  confirm(){ this.tone(523,0.12,'triangle',0.1); this.tone(784,0.16,'triangle',0.1,0.09); },
+  whoosh(){ this.noise(0.7,0.1,300,3800); },
+  sting(){ this.tone(220,0.5,'sawtooth',0.06); this.tone(233,0.5,'sawtooth',0.06,0.02); },
+  statUp(){ this.tone(520,0.1,'sine',0.09); this.tone(780,0.14,'sine',0.09,0.08); },
+  statDown(){ this.tone(330,0.14,'sine',0.09); this.tone(220,0.2,'sine',0.09,0.1); },
+  fanfare(rank){
+    if(rank==='gold'){ [523,659,784,1047].forEach((f,i)=>this.tone(f,0.35,'triangle',0.11,i*0.13)); }
+    else if(rank==='violet'){ [440,415,494,370].forEach((f,i)=>this.tone(f,0.4,'sine',0.09,i*0.16)); }
+    else { this.tone(110,1.2,'sawtooth',0.08); this.tone(116,1.2,'sawtooth',0.08,0.05); this.tone(55,1.6,'sine',0.1,0.1); }
+  },
+  ambient(){
+    if(this.muted || !this.ctx || this.ambNodes.length) return;
+    try{
+    [110,164.8,220].forEach(f=>{
+      const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+      o.type='sine'; o.frequency.value=f; g.gain.value=0.012;
+      o.connect(g); g.connect(this.ctx.destination); o.start();
+      this.ambNodes.push(o);
+    });
+    }catch(e){}
+  },
+  stopAmbient(){ this.ambNodes.forEach(o=>{try{o.stop()}catch(e){}}); this.ambNodes=[]; }
+};
+
+// ---------- particles ----------
+const FX = {
+  cv:null, cx:null, ps:[], running:false,
+  init(){ this.cv=$('fx'); this.cx=this.cv.getContext('2d'); this.resize();
+    window.addEventListener('resize',()=>this.resize());
+    for(let i=0;i<70;i++) this.ps.push(this.mote(true));
+    if(!this.running){ this.running=true; requestAnimationFrame(()=>this.tick()); } },
+  resize(){ this.cv.width=innerWidth; this.cv.height=innerHeight; },
+  mote(any){ return {x:Math.random()*this.cv.width, y:any?Math.random()*this.cv.height:this.cv.height+10,
+    vx:(Math.random()-.5)*.25, vy:-.15-Math.random()*.35, r:.6+Math.random()*1.8,
+    a:.12+Math.random()*.3, c:'245,197,24', life:Infinity}; },
+  burst(x,y,color,n=40,spd=4){ for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, s=.5+Math.random()*spd;
+    this.ps.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:1+Math.random()*2.4,a:.9,c:color,life:50+Math.random()*40}); } },
+  rain(color,n=90){ for(let i=0;i<n;i++) this.ps.push({x:Math.random()*this.cv.width,y:-10-Math.random()*200,
+    vx:(Math.random()-.5)*.6,vy:1+Math.random()*2.4,r:1+Math.random()*2.6,a:.85,c:color,life:200+Math.random()*120}); },
+  tick(){
+    const {cx, cv} = this; cx.clearRect(0,0,cv.width,cv.height);
+    this.ps = this.ps.filter(p=>p.life>0 && p.y<cv.height+20);
+    while(this.ps.filter(p=>p.life===Infinity).length<60) this.ps.push(this.mote(false));
+    for(const p of this.ps){
+      p.x+=p.vx; p.y+=p.vy; if(p.life!==Infinity){p.life--; p.a*=.985;}
+      cx.beginPath(); cx.arc(p.x,p.y,p.r,0,7);
+      cx.fillStyle=`rgba(${p.c},${Math.max(0,p.a)})`; cx.fill();
+    }
+    requestAnimationFrame(()=>this.tick());
+  },
+  flash(){ const f=$('flash'); f.style.transition='none'; f.style.opacity=.55;
+    requestAnimationFrame(()=>{ f.style.transition='opacity .6s'; f.style.opacity=0; }); }
+};
+
+/* ================================================================
+   STORY DATA — all prose hand-authored. No placeholders.
+   Stats: health / nerve / allies / fortune (0–100, start 50)
+   ================================================================ */
+const SCENARIOS = {};
+
+SCENARIOS.diver = {
+  id:'diver', icon:'🌊', title:'Your Life As a Deep-Sea Diver',
+  tagline:'Three hundred metres down, the dark does not forgive. Neither does the company.',
+  chapters:[
+  {
+    id:'d1', name:'COLD OPEN',
+    narration:`The North Sea does not care that this is your first bell run of the hitch.\n\nAbove you, a storm is chewing the rigging and spitting rain sideways across the deck. Below you — three hundred metres of black water, cold enough to stop a heart in minutes. You sit in the diving bell with Mara Voss, who has logged more bottom time than you have birthdays, and she is watching you the way old divers watch new weather.\n\n"Seals," she says. It is not a question. It is a ritual.`,
+    vignettes:[
+      `Somewhere above, the storm drums on steel. Down here, your breathing is the loudest thing in the world.`,
+      `Mara's eyes never leave your hands. Trust, you are learning, is assembled one checklist at a time.`
+    ],
+    choices:[
+      { id:'d1c1', lead:'The pre-dive ritual. Mara is waiting.',
+        options:[
+          { id:'a', text:'Run the seal check a third time, slowly, narrating each step.',
+            effects:{nerve:8, allies:6, fortune:-4},
+            result:`You check every seal a third time, calling each one out loud. Mara's mouth twitches — the closest thing to a smile she owns. "Good," she says. "The sea rewards the boring." The bell drops on schedule, and your hands are steady. The company docks your efficiency bonus. You do not care.` },
+          { id:'b', text:'Trust the checklist — twice is enough. Speed matters on this rig.',
+            effects:{nerve:-6, fortune:6},
+            result:`You sign off after the second pass. The bell drops fast and the foreman notes your turnaround time with approval. But at two hundred metres, a hiss you cannot quite place threads through your helmet, and your heart spends the whole dive auditioning for a drum solo. It was nothing. This time.` }
+        ]},
+      { id:'d1c2', lead:'In the bell, during the long descent, Mara asks about the rookie who quit last hitch.',
+        options:[
+          { id:'a', text:'"He was scared of the dark. I get it — I just refuse to be."',
+            effects:{allies:8, nerve:4},
+            result:`You answer honestly. Mara studies you for a long moment, then nods once. "Fear is data," she says. "Panic is the enemy." Something loosens between you — the particular trust of people who may one day hold each other's lives in gloved hands.` },
+          { id:'b', text:'Keep it professional. "He made his choice. I made mine."',
+            effects:{nerve:7, allies:-5},
+            result:`You keep your eyes on the gauges. Mara shrugs and does the same. The descent continues in efficient silence. You feel composed, armored — and faintly aware that armor is lonely at three hundred metres.` },
+          { id:'c', text:'Deflect with humor. "He heard about the food. Smart man."',
+            effects:{allies:5, nerve:2},
+            result:`Mara actually laughs — a short, surprised bark. "The food IS a war crime," she admits. The tension in the bell drops ten fathoms. Humor, you note, is also a kind of equipment.` }
+        ]},
+      { id:'d1c3', lead:'On the seabed, a valve on the wellhead is seized solid. The job clock is running.',
+        options:[
+          { id:'a', text:'Put your back into it. Force the valve now.',
+            effects:{health:-12, fortune:8, nerve:4},
+            result:`You brace and heave. The valve screams, gives — and your shoulder gives a little too, a hot wire of pain down your arm. The job finishes ahead of schedule and the bonus lands. You spend the decompression doing quiet math about how many more heaves your body has in it.` },
+          { id:'b', text:'Report it and wait for the topside engineer\'s call.',
+            effects:{allies:7, fortune:-6, nerve:5},
+            result:`You report the seized valve and hold position, breathing slow. Topside talks you through a workaround that takes forty extra minutes. Mara squeezes your shoulder on the way up. "Patient divers," she says, "are old divers."` }
+        ]}
+    ],
+    events:[
+      { id:'d1e1', title:'Galley rumor', text:`Over reconstituted stew, a roustabout mutters that the company has been deferring maintenance on the bell winches to save money. Half the table goes quiet. Mara is watching you — not the roustabout.`,
+        options:[
+          { id:'a', text:'Ask questions. Quietly. Remember every name and date.',
+            effects:{allies:6, nerve:-4}, flags:['knows_winches'],
+            result:`You ask three careful questions and memorize the answers. The roustabout looks relieved someone finally listened. Mara says nothing, but later you find a maintenance log photocopy folded into your locker. Knowledge, you realize, is also ballast.` },
+          { id:'b', text:'Let it go. Above your pay grade, below your business.',
+            effects:{nerve:5, allies:-4},
+            result:`You keep eating. The conversation moves on. But that night the winch groans over your bunk in a way you had never noticed before, and you notice it every night after.` }
+        ]},
+      { id:'d1e2', title:'The storm peaks', text:`The storm finds its voice at 0200 — the whole rig shudders, and the dive schedule is scrubbed. You are confined to quarters with Mara and a deck of cards missing the queen of hearts.`,
+        options:[
+          { id:'a', text:'Deal Mara in. Loser tells a true story.',
+            effects:{allies:8, nerve:3},
+            result:`You lose spectacularly. Your true story is about the first time you saw the ocean and understood, at age nine, that you would spend your life trying to get under it. Mara listens all the way through. Her story, when it comes, is about a bell that did not come back up in '09. She does not finish it. She does not need to.` },
+          { id:'b', text:'Sleep. Rest is equipment too.',
+            effects:{health:8, nerve:4},
+            result:`You sleep twelve hours straight, the deep dreamless kind. You wake with your body humming like a tuned cable — ready, rested, a fraction more alive than yesterday.` }
+        ]}
+    ]
+  },
+  {
+    id:'d2', name:'THE CALL',
+    narration:`Three weeks later, in a dockside bar in Aberdeen, a man with a salvage company's logo stitched on his jacket slides a folder across the table.\n\nA wreck on the continental shelf. A strongbox in the captain's cabin. Triple your rig pay, cash, off the books — and no standby diver, because standby divers ask questions and file reports. He smiles like this is all perfectly normal.\n\nYour phone buzzes. Mara: "Whatever he offered. Don't."`,
+    vignettes:[
+      `Triple pay. No standby diver. The math is simple; the arithmetic of survival is not.`,
+      `Mara's text glows on the screen. Some warnings are also a kind of love.`
+    ],
+    choices:[
+      { id:'d2c1', lead:'The offer sits on the table like a loaded harpoon.',
+        options:[
+          { id:'a', text:'Take the job. Triple pay doesn\'t knock twice.',
+            effects:{fortune:16, nerve:-6}, flags:['took_wreck_job'],
+            result:`You shake the man's hand. The money hits your account before you reach the door — half up front, the rest on delivery of the strongbox. Your hands shake for an hour afterward. From excitement. Probably.` },
+          { id:'b', text:'Walk away. Some money costs more than it pays.',
+            effects:{allies:10, fortune:-6, nerve:6},
+            result:`You leave the folder on the table and walk out into the Aberdeen rain. Mara meets your eyes across the bar's window and raises her glass. You feel poorer and taller at the same time.` }
+        ]},
+      { id:'d2c2', lead:'If you took the wreck job — Mara deserves to know. Or does she?',
+        options:[
+          { id:'a', text:'Tell Mara everything. Ask her to be your unofficial standby.',
+            req:{flags:['took_wreck_job']}, effects:{allies:8, nerve:6}, flags:['mara_knows'],
+            result:`You tell her. She is furious for exactly ninety seconds, then practical for the rest of the night. "I will be on the boat," she says. "Not in the water — on the boat, with a radio and a knife. If you die, I am billing your estate." It is the kindest thing anyone has ever said to you.` },
+          { id:'b', text:'Keep it secret. What she doesn\'t know can\'t drown her.',
+            req:{flags:['took_wreck_job']}, effects:{fortune:6, allies:-12, nerve:-5}, flags:['kept_secret'],
+            result:`You say nothing. The lie sits between you and Mara like a third person at the table, and every laugh for the rest of the night sounds slightly wrong. Secrets, you are learning, have weight. They pull.` },
+          { id:'c', text:'You walked away from the job — this choice is already made.',
+            req:{notflags:['took_wreck_job']}, effects:{nerve:4},
+            result:`There is nothing to confess. You sleep the clean sleep of the uncompromised, and dream of ordinary water.` }
+        ]},
+      { id:'d2c3', lead:'The dive is in six days. Your personal gear is due for overhaul.',
+        options:[
+          { id:'a', text:'Buy your own backup rebreather. Full service. No shortcuts.',
+            effects:{fortune:-10, health:10, nerve:5},
+            result:`It costs a brutal amount of money. The technician shows you the old unit's cracked diaphragm — the thing that would have failed at depth — and you feel briefly, physically sick. Then profoundly calm. You have purchased the cheapest thing in diving: certainty.` },
+          { id:'b', text:'Company gear is certified. Save the money.',
+            effects:{fortune:6, health:-6},
+            result:`The company kit passes inspection. Probably. You pocket the savings and try not to think about the word "probably" at three hundred metres. You think about it constantly.` }
+        ]}
+    ],
+    events:[
+      { id:'d2e1', title:'The letter from home', text:`Your sister writes that the roof is leaking and the estimate is more than she has. She does not ask for money. She never asks. That is the ask.`,
+        options:[
+          { id:'a', text:'Send half your pay. Roofs before bonuses.',
+            effects:{fortune:-10, nerve:8, allies:4},
+            result:`You wire the money before you can do the math. She calls, crying, and you stand in an Aberdeen phone box feeling richer than triple pay ever made you. Some ledgers are not kept in banks.` },
+          { id:'b', text:'Keep it. You\'ll need every penny where you\'re going.',
+            effects:{fortune:6, nerve:-6},
+            result:`You keep the money. The number in your account is comforting in the exact way a locked door is comforting — it keeps things out, including, you notice, your own sleep.` }
+        ]},
+      { id:'d2e2', title:'The old diver\'s warning', text:`At the dock you meet a man with a ruined knee and a stare that has seen the bottom. "Wreck diving," he says, "is just regular diving, except the building is trying to kill you and nobody is watching."`,
+        options:[
+          { id:'a', text:'Buy him a drink. Ask what he\'d do differently.',
+            effects:{nerve:8, allies:3},
+            result:`He talks for two hours. Slow is smooth. Never trust a manifest. Always know where the nearest hard overhead is. You leave with a notebook full of other people's expensive mistakes, which is the cheapest education in the world.` },
+          { id:'b', text:'Nod politely and move on. War stories aren\'t training.',
+            effects:{nerve:-3, fortune:2},
+            result:`You nod and walk on. His voice follows you down the dock anyway: "THE BUILDING IS TRYING TO KILL YOU." You tell yourself it is just an old man's bitterness. The tide disagrees.` }
+        ]}
+    ]
+  },
+  {
+    id:'d3', name:'THE DESCENT',
+    narration:`The wreck lies at two hundred and eighty metres, a freighter folded around a reef like a discarded thought.\n\nYou drop through water that gets colder and older with every metre. At one-eighty, the nitrogen starts its soft singing in your blood — the rapture of the deep, divers call it, which tells you everything about divers. Your umbilical feeds out behind you like a lifeline, because it is one.\n\nThen your air tastes of copper, and the umbilical goes taut against something that should not be there.`,
+    vignettes:[
+      `Nitrogen sings. Copper coats your tongue. The wreck waits below, patient as geology.`,
+      `Your lifeline goes taut. Somewhere in the dark, something has you by the thread.`
+    ],
+    choices:[
+      { id:'d3c1', lead:'Your umbilical has snagged on wreckage. Air still flows — for now.',
+        options:[
+          { id:'a', text:'Cut the umbilical. Go on bailout and swim clear.',
+            effects:{health:-14, nerve:10},
+            result:`You cut. The severed hose whips away into the dark and you are suddenly, completely alone with twelve minutes of bailout air. Terror tries to move in; you evict it with arithmetic — depth, time, ascent rate. You swim clear, shaking, alive, and something in you has been permanently rearranged into a harder shape.` },
+          { id:'b', text:'Work it free slowly. Patience over panic.',
+            effects:{nerve:-8, health:6},
+            result:`You stop. Breathe. Work the snag with infinite, maddening care, feeling minutes pour away like ballast. It comes free with a soft sigh of steel. Your air gauge accuses you, but your body is intact, and intact is a kind of victory.` }
+        ]},
+      { id:'d3c2', lead:'In the captain\'s cabin: the strongbox — and beside it, a diver\'s wedding ring, taped inside a flooded logbook. Someone died here before you.',
+        options:[
+          { id:'a', text:'Take the box and the ring. The dead don\'t spend.',
+            effects:{fortune:14, nerve:-10, allies:-6}, flags:['took_ring'],
+            result:`You pocket both. The ring is warm from your own hand, which feels obscene. All the way up, the copper taste is back in your mouth, and you cannot decide if it is the air or your conscience corroding.` },
+          { id:'b', text:'Take the box. Log the ring\'s position for recovery — someone is owed a goodbye.',
+            effects:{fortune:9, allies:8, nerve:4},
+            result:`You photograph the logbook page, note the coordinates on your slate, and take only the box. It costs you nothing and buys you something: the ability to look at your own hands afterward. Mara, when you tell her, goes very quiet. "Good," she says finally. "Good."` }
+        ]},
+      { id:'d3c3', lead:'Narcosis is blooming — colors at the edge of vision, a giggling urge at the worst possible moment.',
+        options:[
+          { id:'a', text:'Ascend twenty metres to clear your head. Lose bottom time.',
+            effects:{health:9, fortune:-8, nerve:3},
+            result:`You rise, slow and disciplined, and the singing fades. The wreck shrinks below you, patient. You lose the strongbox's outer compartment — time ran out — but you keep your mind, which was always the more valuable cargo.` },
+          { id:'b', text:'Push through it. Mind over molecules.',
+            req:{stat:'nerve', min:55}, effects:{nerve:9, fortune:8},
+            result:`You lock onto your training like a lifeline — checklists, counts, the litany of the competent. The narcosis breaks against you like water on a hull. You finish the job clear-headed and almost insulted by how easy the deep found you to be.` },
+          { id:'c', text:'Push through it anyway. (Your nerve is shaky.)',
+            req:{notstat:'nerve', min:55}, effects:{health:-12, nerve:-8},
+            result:`You try to push through and the deep pushes back harder. For ninety seconds you are convinced the wreck is breathing. You complete the task but surface with a nosebleed, a tremor, and a new understanding of your own limits — tuition paid in blood.` }
+        ]}
+    ],
+    events:[
+      { id:'d3e1', title:'Mara\'s confession', text:`On the boat, over coffee that tastes of diesel, Mara says very quietly: "The company knew a diver died on that wreck. Two years ago. They hired you anyway." She will not meet your eyes.`,
+        options:[
+          { id:'a', text:'"Then we report them. Together. After this dive."',
+            effects:{allies:7, nerve:-4}, flags:['vs_company'],
+            result:`She exhales like she has been holding that breath for two years. "Together," she agrees. A pact made over bad coffee, at sea, between people the company considers equipment. It feels like the first honest thing in weeks.` },
+          { id:'b', text:'Bury it. Finish the job, take the money, disappear.',
+            effects:{fortune:6, nerve:-9},
+            result:`You say nothing can be proved and everything can be lost. Mara nods slowly, but something in her face closes like a hatch. You have chosen the money over the person. The money does not look at you the way she just did.` }
+        ]},
+      { id:'d3e2', title:'The shape in the silt', text:`Mid-dive, your lamp catches movement — a shape, man-sized, drifting in the silt cloud. Your heart relocates to your throat. It resolves: a drowned cargo net, swaying in the current. Just a net.`,
+        options:[
+          { id:'a', text:'Laugh into your regulator. Log it as a funny story.',
+            effects:{nerve:7},
+            result:`You laugh, bubbles everywhere, and the fear drains out of you like water from a boot. Back on the boat you tell it well — the net, the scream you definitely did not make — and the crew laughs with you, not at you. Fear shared is fear halved.` },
+          { id:'b', text:'Say nothing. File it under things the deep shows you.',
+            effects:{nerve:-5, health:3},
+            result:`You say nothing. But for the rest of the dive your lamp sweeps a little wider, your breathing runs a little faster, and you understand that some things you see down here, you carry up alone.` }
+        ]}
+    ]
+  },
+  {
+    id:'d4', name:'THE TURN',
+    narration:`It happens the way it always happens: all at once, and in slow motion.\n\nThe wreck shifts on the reef with a groan you feel in your molars. Silt erupts — total whiteout, zero visibility. Your world shrinks to the sound of your own breathing and Mara's voice on the comm, suddenly tight: "I'm trapped. Debris on my umbilical. Air's going."\n\nYou have one bailout bottle. You have the strongbox. You cannot carry both through a silt-out. The deep, patient as ever, waits for your answer.`,
+    vignettes:[
+      `Zero visibility. One bottle. One box. One friend. The arithmetic of the deep has never been crueler.`,
+      `Mara's breathing on the comm — fast, then deliberately slow. She is doing the math too.`
+    ],
+    choices:[
+      { id:'d4c1', lead:'Mara is losing air. The strongbox is in your hands.',
+        options:[
+          { id:'a', text:'Give Mara your bailout. Guide her out. Abandon the box.',
+            effects:{allies:16, fortune:-20, health:-10, nerve:8}, flags:['saved_mara'],
+            result:`You press your bailout into her hands and take her harness. The swim out is the longest ten minutes of your life, navigated by touch and memory and prayer. On deck, Mara rips her helmet off and does something she has never done: she cries. "Idiot," she sobs, holding your face. "Beautiful, stupid idiot." The box sits on the seabed. You have never been richer.` },
+          { id:'b', text:'Secure the box first — then go back for Mara. Seconds matter, money matters.',
+            effects:{fortune:12, allies:-16, health:-6, nerve:-6}, flags:['box_first'],
+            result:`You clip the box to your harness and THEN swim for Mara. She survives — barely — and she knows exactly what you chose first. On the boat she does not speak to you. The money clears. So does something else: the particular silence of a friendship you spent like cash.` }
+        ]},
+      { id:'d4c2', lead:'Back on deck, the company man finds you. A bonus — for your silence about the dead diver.',
+        options:[
+          { id:'a', text:'Take the hush money. The dead are past helping.',
+            effects:{fortune:15, nerve:-10, allies:-6}, flags:['took_hush'],
+            result:`The bonus is obscene. You take it. That night you buy the best dinner in Aberdeen and taste nothing. Mara's empty chair at the bar says everything she will not. You are wealthy, and you are alone with it.` },
+          { id:'b', text:'Refuse. Report everything — the dead diver, the winches, all of it.',
+            effects:{allies:10, fortune:-10, nerve:8}, flags:['reported'],
+            result:`You refuse, and you report — the dead diver, the deferred winch maintenance, all of it, with dates and names. The company threatens. Mara stands beside you at the hearing, in her good jacket. "Together," she reminds you. The industry is small. Your name, it turns out, is now spoken with a particular respect.` }
+        ]}
+    ],
+    events:[
+      { id:'d4e1', title:'The last dream', text:`The night before the final dive, you dream of the surface — not as a place, but as a sound: gulls, wind, a kettle whistling in a kitchen you have not seen in months. You wake with salt on your face. Or tears. At depth, no one can tell the difference.`,
+        options:[
+          { id:'a', text:'Let it steady you. The surface is waiting. Go earn it.',
+            effects:{nerve:6, health:4},
+            result:`You hold the dream like a compass. Gulls. Wind. Kettle. Every metre down is a metre you will climb back up. The dream does not make you soft — it makes you pointed, like a harpoon, aimed at the light.` },
+          { id:'b', text:'Shake it off. Sentiment is nitrogen for the soul.',
+            effects:{nerve:-3, fortune:3},
+            result:`You shake it off and check your gear twice instead. The dream fades by breakfast. But at two hundred metres, unspooling into the dark, you hear — or imagine — a kettle whistling, impossibly far above. You smile into your regulator. Some compasses are invisible.` }
+        ]}
+    ]
+  },
+  {
+    id:'epilogue', name:'EPILOGUE', epilogue:true,
+    endings:[
+      { id:'div-tri', title:'Legend of the Rigs', rank:'gold',
+        when:s=>s.flags.includes('saved_mara') && s.stats.nerve>=55,
+        text:`They tell your story in galleys from Aberdeen to Stavanger now — how you gave your air to Mara Voss in a silt-out and swam her home by touch and memory.\n\nThe salvage company blacklists you. It does not matter. Every rig master in the North Sea wants the diver who chooses people over payloads, and your dance card is full for years. Mara names her first boat after you, which embarrasses you both equally.\n\nOn quiet nights at depth, three hundred metres down, you think about the arithmetic of that day — one bottle, one box, one friend — and you have never once, not for a second, redone the math.` },
+      { id:'div-bit', title:'The Quiet Shore', rank:'violet',
+        when:s=>s.stats.health>=35,
+        text:`You retire at forty-one, which in saturation diving is roughly a hundred and ten.\n\nYou teach now — young divers with bright eyes and unscarred hands, learning the litany: slow is smooth, patient divers are old divers, fear is data. Some nights the old shoulder aches before rain, and some nights you wake hearing a winch groan that isn't there.\n\nYou kept your life. You kept your name. The sea kept the rest, and that — you have finally decided — was a fair trade.` },
+      { id:'div-tra', title:'What the Deep Keeps', rank:'red',
+        when:s=>true,
+        text:`The inquiry uses words like "procedural deviation" and "contributory negligence." Your license is suspended, then quietly not renewed.\n\nMara still calls on birthdays. The calls get shorter every year. The money — there was money, wasn't there? — went the way money goes: quickly, and without gratitude.\n\nSometimes you drive to the coast and watch the supply boats go out. The sea does not remember you. That is the worst part. You gave it everything, and it kept the change.` }
+    ]
+  }]
+};
+
+SCENARIOS.knight = {
+  id:'knight', icon:'⚔️', title:'Your Life As a Medieval Knight',
+  tagline:'Oaths are easy to swear by candlelight. The field at dawn is another matter.',
+  chapters:[
+  {
+    id:'k1', name:'COLD OPEN',
+    narration:`The camp does not sleep the night before a battle. It pretends.\n\nYou lie in your armor — you were told never to do this, you do it anyway — listening to ten thousand men breathe in the dark. Somewhere a horse screams at nothing. Somewhere a priest is still working through the line of the condemned, I mean the blessed, I mean the soon-to-be-either.\n\nSer Odo, who knighted you with a sword older than your grandfather, crouches beside your bedroll. "Tomorrow," he says, "you will learn which of your fears are liars."`,
+    vignettes:[
+      `Ten thousand breaths in the dark. Yours is the only one you can control.`,
+      `Ser Odo's sword is older than your grandfather. Tomorrow you find out if you are worthy of either.`
+    ],
+    choices:[
+      { id:'k1c1', lead:'The long night before dawn. How do you spend it?',
+        options:[
+          { id:'a', text:'Find the chaplain. Pray until the fear has a shape you can carry.',
+            effects:{nerve:9, allies:3},
+            result:`You kneel in the mud beside killers and boys and pray until the shaking moves from your hands into your voice and then, finally, out of you entirely. Dawn will bring what it brings. You have made your arrangements with God, which is more than most men here can say.` },
+          { id:'b', text:'Sharpen your sword alone. Let the rhythm do the praying.',
+            effects:{nerve:7, health:3},
+            result:`Stone on steel, stone on steel, until your arm burns and your mind goes quiet as a chapel. A edge you can shave with. A arm that will not tire by noon. Fear, you discover, cannot survive boredom — and you have made yourself magnificently bored.` },
+          { id:'c', text:'Drink with the men-at-arms. Tonight, you are all just men.',
+            effects:{allies:9, nerve:-3},
+            result:`You drink watered wine and listen to a pikeman from Kent describe his wife's pies with the devotion of a poet. They laugh when you laugh. When the cups are empty, three of them clasp your shoulder and say they will watch your back tomorrow. You believe them. That belief is armor too.` }
+        ]},
+      { id:'k1c2', lead:'Ser Odo offers you his banner to carry into the battle — a great honor, and a target painted on your back.',
+        options:[
+          { id:'a', text:'Accept the banner. Let them all see whose colors you bear.',
+            effects:{allies:8, fortune:6, health:-6},
+            result:`You take the ash pole in both hands. The silk snaps above you like a living thing. Every enemy archer on the field will know exactly where you are — and so will every man of your company, who will fight harder for the sight of those colors upright. Glory has a price. You have just agreed to pay it in the open.` },
+          { id:'b', text:'Decline with respect. "My place is in the line, ser — shoulder to shoulder."',
+            effects:{nerve:6, allies:4},
+            result:`Odo studies you, then nods slowly and gives the banner to young Percival, who goes pale with pride. You take your place in the shield line, anonymous and unmissable at once. Odo claps your pauldron. "A knight who knows his place," he says, "is rarer than a brave one."` }
+        ]},
+      { id:'k1c3', lead:'Dawn. The enemy line stretches to the horizon. The order comes: advance.',
+        options:[
+          { id:'a', text:'Hold the line. Shoulder to shoulder, step by step.',
+            effects:{allies:7, health:4, nerve:4},
+            result:`You advance at a walk, shields locked, and the field becomes a slow grinding thing of mud and iron. A spear finds your shield and stays there. You hold. The man beside you holds because you hold. This is what battles actually are — not glory, but ten thousand small refusals to run.` },
+          { id:'b', text:'Break ranks and charge. Let them remember your name.',
+            effects:{fortune:10, health:-12, nerve:6},
+            result:`You scream and run, and for one bright minute you are the hero of every song you ever heard — until a poleaxe catches your leg and the songs go very quiet. You kill two men before they drag you back to the chirurgeon's tent. Your name IS remembered. So is your limp.` }
+        ]}
+    ],
+    events:[
+      { id:'k1e1', title:'The charm-seller', text:`A camp follower with one eye presses a "blessed" boar's tooth into your palm. "Kings have died without one, ser. Five pennies." The tooth smells faintly of soup.`,
+        options:[
+          { id:'a', text:'Buy it. Five pennies for courage is cheap.',
+            effects:{nerve:6, fortune:-3},
+            result:`You buy the tooth and hang it inside your cuirass. It does nothing, objectively. Subjectively, your hand stops shaking. Magic, you reflect, is just psychology with better marketing — and you feel no shame about needing it.` },
+          { id:'b', text:'Refuse. Steel and prayer are enough.',
+            effects:{nerve:3, fortune:2},
+            result:`You wave her off. She shrugs and sells it to Percival for seven pennies. You keep your coins and your skepticism. Both, you suspect, will be tested before noon.` }
+        ]},
+      { id:'k1e2', title:'The squire\'s challenge', text:`A squire half your size, drunk on fear and wine, accuses you of cowardice for "hiding in the line" and demands satisfaction. Men are watching.`,
+        options:[
+          { id:'a', text:'Laugh it off. Buy him a drink instead of a beating.',
+            effects:{allies:7, nerve:2},
+            result:`You laugh — genuinely — and buy him wine. He cries into his cup within minutes; he is sixteen and terrified. By dawn he is your most devoted follower. Mercy, you are learning, recruits better than muscle.` },
+          { id:'b', text:'Answer steel with steel. A lesson, quickly taught.',
+            effects:{nerve:5, allies:-5, health:-3},
+            result:`You disarm him in four moves and leave him sitting in the mud. The watchers nod approvingly. The boy never meets your eyes again — and you notice, later, that his friends stand a little farther from you too. Respect, bought this way, spends poorly.` }
+        ]}
+    ]
+  },
+  {
+    id:'k2', name:'THE CALL',
+    narration:`You survive the battle. This surprises you more than anyone.\n\nTwo weeks later, two messages arrive in the same hour. The first: the King summons his knights south, to the great campaign — glory, land, a place in the songs. The second: a mud-spattered rider from the village of Ashford, begging for swords. Reavers are burning the valley. The King's orders say the valley is not the army's concern.\n\nSer Odo reads both messages, looks at you, and says nothing. The choice, his silence says, is the test.`,
+    vignettes:[
+      `Two messages. One hour. The King's glory, or a burning valley the King has written off.`,
+      `Ser Odo's silence is the heaviest counsel you have ever received.`
+    ],
+    choices:[
+      { id:'k2c1', lead:'The King commands south. Ashford burns west. You cannot ride both ways.',
+        options:[
+          { id:'a', text:'Obey the King. Oaths are not weather vanes.',
+            effects:{fortune:10, allies:5, nerve:-4}, flags:['obeyed_king'],
+            result:`You ride south with the host, and Ashford's smoke stays on the western horizon for three days. The King notes your obedience. Your sleep notes other things. Oaths, you tell yourself at night, are load-bearing — remove one and the whole structure of you might come down.` },
+          { id:'b', text:'Ride west to Ashford. The King has ten thousand swords; the village has you.',
+            effects:{allies:12, fortune:-8, nerve:7}, flags:['saved_ashford','broke_orders'],
+            result:`You turn your horse west, and six men-at-arms turn with you without being asked — the pikeman from Kent among them. Ashford is saved by seven swords and a great deal of shouting. The villagers weep and press bread into your hands. The King's displeasure can wait. Bread, given like that, cannot.` }
+        ]},
+      { id:'k2c2', lead:'After the campaign season, spoils are divided. Your share is generous.',
+        options:[
+          { id:'a', text:'Share it with your men. Every penny, openly.',
+            effects:{allies:12, fortune:-6},
+            result:`You divide your share among the men-at-arms in front of them all, keeping nothing back. The pikeman from Kent stares at his coins like they are a miracle. From that day, your company would follow you into the sea. Loyalty, purchased at full price, never depreciates.` },
+          { id:'b', text:'Send the bulk home. Land is forever; loyalty is weather.',
+            effects:{fortune:14, allies:-6},
+            result:`You send the gold home to buy fields. Sensible. Prudent. Your father's letter back is warm with pride. Your men notice your new horse and say nothing, which is itself a kind of speech you are learning to hear.` }
+        ]},
+      { id:'k2c3', lead:'Among the prisoners is a young enemy knight, wounded, proud, and worth a fortune in ransom.',
+        options:[
+          { id:'a', text:'Ransom him. War is expensive; prisoners are inventory.',
+            effects:{fortune:12, allies:-4},
+            result:`The ransom is paid in good silver. Your coffers swell. The young knight, as he is led away, meets your eyes with pure contempt — and you feel, absurdly, like the prisoner. Some transactions cost more than coin.` },
+          { id:'b', text:'Have his wounds treated first. Then discuss ransom like civilized men.',
+            effects:{allies:8, nerve:4, fortune:4}, flags:['mercy_knight'],
+            result:`You send for the chirurgeon before the ransom broker. The young knight is bewildered, then — over weeks of convalescence — becomes something unexpected: a friend. "You fight like a butcher," he tells you cheerfully, "but you keep house like a gentleman." Enemies, you learn, are just allies you haven't ransomed kindly yet.` }
+        ]}
+    ],
+    events:[
+      { id:'k2e1', title:'Plague rumors', text:`Word spreads through camp: plague in the southern towns. Men are deserting by night to check on families. The provost wants examples made — a flogging at dawn to "steady" the rest.`,
+        options:[
+          { id:'a', text:'Speak for the men. Ask the provost for leave-rotations instead of lashes.',
+            effects:{allies:8, fortune:-3},
+            result:`You argue, carefully, that men who trust their lord fight better than men who fear him. The provost sneers but grants rotations — and the desertions stop overnight. The men do not forget who spoke. Neither, unfortunately, does the provost.` },
+          { id:'b', text:'Stay out of it. Discipline is the provost\'s trade, not yours.',
+            effects:{nerve:-4, allies:-6},
+            result:`You stay in your tent during the flogging. The screams carry. Afterward the camp is quieter, and not in a good way — the quiet of men doing arithmetic about their officers. You tell yourself it was not your business. Your business disagrees.` }
+        ]},
+      { id:'k2e2', title:'Father\'s letter', text:`Your father's hand shakes more than it did last year. The letter says the harvest failed, the taxes did not, and he is proud of you. The last line is underlined twice: "Come home alive. That is the only order I will ever give you."`,
+        options:[
+          { id:'a', text:'Write back that night. Promise nothing; say everything.',
+            effects:{nerve:7, health:3},
+            result:`You write by candlelight until the words run out, then keep writing anyway. The letter goes north with the supply wagons. Whatever happens now, he will know you were thinking of him. Some armor is made of paper.` },
+          { id:'b', text:'Fold it away. Letters make the dying harder.',
+            effects:{nerve:-5, fortune:2},
+            result:`You fold the letter into your breastplate and do not answer it. Focus is also a kind of love, you tell yourself. The breastplate feels heavier than steel should.` }
+        ]}
+    ]
+  },
+  {
+    id:'k3', name:'THE DESCENT',
+    narration:`The siege of Thornwall enters its fourth month, and the war has stopped being about anything you can name.\n\nYou have eaten horse, then dog, then things you choose not to identify. The enemy on the walls looks as hollow as you feel. Yesterday your friend Tomas — who taught you to cheat at dice and meant it kindly — slipped over the wall at midnight and did not come back. Desertion means hanging, if the provost finds him. Starvation means dying, if no one does.\n\nThe lord summons his knights. The assault is ordered for dawn. The breach, they say, is "practicable." You have seen the breach. It is a mouth full of broken teeth.`,
+    vignettes:[
+      `Four months of siege. You have eaten horse, then dog, then things you do not name.`,
+      `Tomas went over the wall at midnight. The provost wants a hanging. You want your friend alive.`
+    ],
+    choices:[
+      { id:'k3c1', lead:'Tomas deserted. The provost is asking questions, and looking at you.',
+        options:[
+          { id:'a', text:'Report what you know. The law is the law, even for friends.',
+            effects:{allies:-12, fortune:6, nerve:-6}, flags:['reported_tomas'],
+            result:`You tell the provost what you know. Tomas is caught two nights later, trying to reach his starving family. You do not attend the hanging. Nobody asks you to. Nobody has to. Your men look at you differently now — correctly, you suppose, and that is the worst part.` },
+          { id:'b', text:'Cover for him. "Tomas? Haven\'t seen him since the sortie."',
+            effects:{allies:10, nerve:-5}, flags:['covered_tomas'],
+            result:`You lie to the provost's face, smoothly, completely. That night you leave food and a waterskin where a deserter might find them. If Tomas lives, no one will ever know it was you. If he dies, no one will ever know either. Some debts are paid in silence.` },
+          { id:'c', text:'Find Tomas yourself. Bring him back before the provost does.',
+            req:{stat:'allies', min:55}, effects:{allies:12, nerve:6, health:-5}, flags:['saved_tomas'],
+            result:`Because the men love you, they talk — and you find Tomas hiding in a burned-out mill, half-starved, weeping. You bring him back through the postern gate yourself and stand surety for him before the lord. It costs you favor and nearly costs you rank. Tomas lives. That is the whole of the accounting, and it balances.` }
+        ]},
+      { id:'k3c2', lead:'Dawn. The breach. The assault horn sounds.',
+        options:[
+          { id:'a', text:'Lead the forlorn hope into the breach. First in.',
+            effects:{health:-16, fortune:14, nerve:10}, flags:['led_breach'],
+            result:`You go in first, over the broken teeth of the wall, and the world becomes noise and iron for an hour that lasts a lifetime. You take a spear in the thigh and give worse than you get. When the breach falls, the army pours through behind you — over ground you paid for in blood. Men will sing about this. Your leg will remind you, every rainy day, what songs cost.` },
+          { id:'b', text:'Hold the line with your company. No one advances alone.',
+            effects:{allies:9, health:-6, nerve:5},
+            result:`You keep your company together and go in as one wall of shields. It is slower, safer, saner — and when the breach falls, every one of your men walks out of it. The pikeman from Kent finds you afterward, weeping, alive. "We all came back," he keeps saying. "We all came back."` }
+        ]},
+      { id:'k3c3', lead:'With the city starving, the enemy offers parley — surrender the outer wall for food and safe passage. The lord asks your counsel.',
+        options:[
+          { id:'a', text:'Advise acceptance. "Dead men hold no walls, my lord."',
+            req:{stat:'nerve', min:55}, effects:{allies:8, nerve:5, fortune:-4},
+            result:`You speak plainly before the war council, and your nerve holds under the old lords' stares. The parley is accepted. Food comes through the gates — thin soup, but soup — and the dying slows. A knight who can say "enough" in a room full of men saying "more" is rarer than a knight who can swing a sword.` },
+          { id:'b', text:'Demand battle. "We did not starve four months to negotiate."',
+            effects:{fortune:8, health:-8, allies:-5},
+            result:`You demand battle, and battle you get — three more weeks of it, and the city's surrender anyway, on worse terms, over fuller graves. The lord remembers who counseled patience and who counseled pride. So do the widows.` }
+        ]}
+    ],
+    events:[
+      { id:'k3e1', title:'The prophecy', text:`A camp woman with burned hands catches your sleeve. "I dreamed your death, ser knight," she whispers. "A red dawn. A choice. Choose the harder thing — it is the only one that lets you live." She vanishes into the crowd before you can answer.`,
+        options:[
+          { id:'a', text:'Take it to heart. The harder thing, from now on.',
+            effects:{nerve:8}, flags:['heeded_prophecy'],
+            result:`You turn her words over like a coin for days. The harder thing. Not the glorious thing, not the safe thing — the harder thing. It becomes a private compass, and on the worst nights of the siege, it is the only one that points anywhere worth going.` },
+          { id:'b', text:'Shake it off. Dreams are the mind\'s indigestion.',
+            effects:{nerve:-3},
+            result:`You shake it off. But at odd moments — before a charge, before a hard choice — her voice returns uninvited: "a red dawn, a choice." You tell yourself it means nothing. You do not entirely believe yourself.` }
+        ]},
+      { id:'k3e2', title:'The wooden horse', text:`In a burned-out house inside the walls, you find a child's wooden horse, one leg snapped off. Someone small loved this. Someone small is probably gone.`,
+        options:[
+          { id:'a', text:'Carve a new leg for it. Leave it where its owner might find it.',
+            effects:{allies:6, nerve:4},
+            result:`You sit in the ruins and carve, slowly, badly, with a dagger. You leave the mended horse on the doorstep. It is a small, stupid, useless act of repair in a city full of ruin — and it steadies you more than prayer has in weeks. Some wars are fought in the heart, one wooden horse at a time.` },
+          { id:'b', text:'Leave it. You cannot mend a city with whittling.',
+            effects:{nerve:-4, fortune:2},
+            result:`You leave the horse in the ashes. You are probably right — it changes nothing. But you think about that horse for the rest of the siege, at the strangest moments, and you cannot say why it feels like a defeat.` }
+        ]}
+    ]
+  },
+  {
+    id:'k4', name:'THE TURN',
+    narration:`The war ends the way wars end: with a treaty, a feast, and unfinished business.\n\nThe enemy champion — the Black Boar, a mountain of a man who killed Ser Odo at Thornwall — stands in the feast hall and issues a formal challenge. Trial by combat. Him against any knight of the King. The hall goes silent. Every eye finds you, because of the breach, because of Odo, because stories have a gravity of their own.\n\nThen the King's steward leans in with quieter news: the King has ordered Ashford — the village you saved, or abandoned — burned, as an example to tax rebels. The order bears the royal seal. Your oath, sworn by candlelight years ago, says obey.`,
+    vignettes:[
+      `The Black Boar killed Ser Odo. Now he wants you, in front of everyone.`,
+      `A royal seal. A burning order. Ashford. Your oath says obey. Everything else says otherwise.`
+    ],
+    choices:[
+      { id:'k4c1', lead:'The Black Boar waits in the lists, axe in hand, patient as a landslide.',
+        options:[
+          { id:'a', text:'Accept. For Odo. For everyone who didn\'t come home.',
+            req:{stat:'nerve', min:50}, effects:{health:-14, fortune:16, nerve:10}, flags:['won_duel'],
+            result:`You walk into the lists and the world narrows to axe and shield and breath. He is stronger. You are faster, and you are angry in the cold, precise way Odo taught you. It ends with his axe in the dirt and your sword at his throat — and you stay your hand, because Odo would have. The hall erupts. The Boar, kneeling, bows his head to you. Mercy, it turns out, is the sharpest weapon in the lists.` },
+          { id:'b', text:'Accept — though your nerve is shaken. Odo deserves the attempt.',
+            req:{notstat:'nerve', min:50}, effects:{health:-18, nerve:-6, fortune:6},
+            result:`You accept because not accepting would be a slower death. The Boar toys with you for five minutes — five years — before your shield splits and you go down in the mud. You survive; barely; humiliatingly. But an odd thing: the young knights treat you with MORE respect after. "He knew he'd lose," they whisper, "and he walked in anyway."` },
+          { id:'c', text:'Decline with honor. "My sword is the King\'s, not my pride\'s."',
+            effects:{nerve:-8, allies:5, health:6},
+            result:`You decline, formally, correctly. The hall's disappointment is a physical weight. But Odo's voice is in your head — "which of your fears are liars" — and you realize declining took its own courage. Not all battles are fought. The wise ones are chosen.` }
+        ]},
+      { id:'k4c2', lead:'The burning order for Ashford sits on the table, sealed and absolute.',
+        options:[
+          { id:'a', text:'Obey. Burn Ashford. The oath is the oath.',
+            effects:{fortune:14, allies:-16, nerve:-10}, flags:['broke_oath_inner','burned_ashford'],
+            result:`You give the order. You watch the smoke from a hill, and the pikeman from Kent — who stood with you in the shield line, who wept when you all came back — looks at you once, then walks away and does not come back. The King rewards you with land. You ride out to see it sometimes. It is good land. It feels like a grave with fences.` },
+          { id:'b', text:'Refuse. "Find another hand for this, my lord. Mine is closed."',
+            effects:{allies:14, fortune:-14, nerve:10}, flags:['defied_king'],
+            result:`You refuse the King to his face, in front of witnesses, and the silence that follows could drown a choir. He strips your rank. He does not — quite — dare strip your head; the men love you too much, and kings count costs too. You walk out of the hall a common sword again. Behind you, quietly, half the company follows. Ashford stands. So do you.` }
+        ]}
+    ],
+    events:[
+      { id:'k4e1', title:'Odo\'s sword', text:`Before the duel, Odo's widow presses his sword — the one older than grandfathers — into your hands. "He would want you to have it," she says. "Bring it back. Or don't come back." She smiles to soften it. It does not soften.`,
+        options:[
+          { id:'a', text:'Swear on it. Mean it.',
+            effects:{nerve:8, allies:4},
+            result:`You swear on the old sword, and the oath settles over you like armor that actually fits. Whatever happens in the lists, you will carry Odo's steel the way he carried you: forward. The widow kisses your forehead. "My husband chose well," she says.` },
+          { id:'b', text:'Accept it humbly. Carry the weight, not just the steel.',
+            effects:{nerve:4, health:4},
+            result:`You accept the sword with both hands and a bow. It is heavier than it looks — or perhaps you are finally feeling the true weight of all such things. You will not waste it. That is the whole of the promise, and it is enough.` }
+        ]}
+    ]
+  },
+  {
+    id:'epilogue', name:'EPILOGUE', epilogue:true,
+    endings:[
+      { id:'kni-tri', title:'The Oathkeeper', rank:'gold',
+        when:s=>s.stats.allies>=60 && !s.flags.includes('burned_ashford'),
+        text:`They sing of you now in halls you will never enter — the knight who held the breach at Thornwall, who spared where others spent, whose men would follow him into the sea.\n\nThe King, in time, restores your rank; kings need legends more than legends need kings. Ashford sends a delegation every harvest with bread and apples, and the children there are named after you in embarrassing numbers.\n\nSer Odo's sword hangs above your hearth, and beneath it, in your own hand, a single line: "Oaths are not chains. They are the shape of the soul that swears them."` },
+      { id:'kni-bit', title:'The Gray Knight', rank:'violet',
+        when:s=>s.stats.health>=35,
+        text:`You live. That is the whole of it, and it is not small.\n\nYou settle in a gray stone tower near the sea, with a limp, a scarred shield, and a reputation that follows you like a well-trained hound. Young knights ride out to ask your counsel, and you tell them the truth: that glory is mostly weather, that mercy is the only victory that keeps, that the bravest thing you ever did was walk out of a king's hall.\n\nSome nights you dream of the lists, of banners, of what-ifs. You wake to gulls and the smell of salt, and you are — against all odds, against all songs — content.` },
+      { id:'kni-tra', title:'A Name on a Stone', rank:'red',
+        when:s=>true,
+        text:`The stone is small and the carving is plain, as you would have wanted.\n\nThey say you died well — or badly, depending on who tells it, which tells you everything about history. The songs, if they remember you at all, get the details wrong. The pikeman from Kent, grown old, sometimes visits the grave and leaves apples. He never speaks. There is nothing left to say that the apples do not say.\n\nOaths are easy to swear by candlelight. The field at dawn is another matter. You learned the difference, in the end. Everyone does.` }
+    ]
+  }]
+};
+
+SCENARIOS.idol = {
+  id:'idol', icon:'🎤', title:'Your Life As a K-Pop Idol',
+  tagline:'A million people will love you. The question is whether you will survive them.',
+  chapters:[
+  {
+    id:'p1', name:'COLD OPEN',
+    narration:`4:47 AM. The practice room mirror shows eight versions of you, and all of them are exhausted.\n\nYou have been a trainee for three years, two months, and eleven days. You know this because Jiwon — your best friend, your rival, your sister in every way that matters — keeps count on the dorm wall in eyeliner. The debut evaluation is in six days. Six days to prove that the last three years were a beginning and not a very expensive mistake.\n\nDirector Han's voice crackles over the speaker: "Again. From the top. Smile this time."`,
+    vignettes:[
+      `Eight reflections in the mirror. All exhausted. All still moving.`,
+      `Jiwon counts the days in eyeliner on the dorm wall. Six days left to matter.`
+    ],
+    choices:[
+      { id:'p1c1', lead:'Your ankle has been swelling for a week. The choreography does not care.',
+        options:[
+          { id:'a', text:'Push through. Pain is just traineeship leaving the body.',
+            effects:{health:-12, nerve:7, fortune:5},
+            result:`You dance on the swelling ankle until it goes numb, which you choose to interpret as healing. Director Han nods at your "commitment." That night you ice it in the dorm sink while Jiwon pretends not to notice you crying. The body keeps score, but so does the evaluation sheet.` },
+          { id:'b', text:'Tell the physio. Rest two days, come back stronger.',
+            effects:{health:10, nerve:-4, fortune:-4},
+            result:`You report the injury. The physio benches you for two days — two days of watching the others drill through the glass, of feeling the group move on without you. But the ankle heals clean, and when you return, you dance like the floor owes you money. Rest, it turns out, is also training.` }
+        ]},
+      { id:'p1c2', lead:'Jiwon keeps missing the turn in the second chorus. She is spiraling.',
+        options:[
+          { id:'a', text:'Stay late with her. Drill it until you both have it.',
+            effects:{allies:12, nerve:3, health:-5}, flags:['helped_jiwon'],
+            result:`You stay until 2 AM, counting for her — "five, six, seven, TURN" — until her body learns what her mind could not. She cries when she finally nails it, and hugs you so hard it hurts your ribs. "Debut or not," she whispers, "we did this." Some investments pay in a currency no chart measures.` },
+          { id:'b', text:'Focus on yourself. The evaluation doesn\'t grade friendship.',
+            effects:{fortune:6, allies:-8, nerve:3},
+            result:`You perfect your own part until it gleams. Jiwon stops asking for help after the second night. On evaluation day she nails the turn anyway — alone — and does not look at you when she does. You score higher. It feels like losing.` },
+          { id:'c', text:'Teach her your mnemonic trick, then get back to your own practice.',
+            effects:{allies:6, fortune:3},
+            result:`You show her the counting trick that saved you last year, then return to your own mirror. It takes twenty minutes and costs you nothing. She gets it by midnight. Efficiency, you learn, can also be kindness — just a quieter kind.` }
+        ]},
+      { id:'p1c3', lead:'Evaluation day. The panel is stone-faced. Your solo slot is now.',
+        options:[
+          { id:'a', text:'Play it safe. Clean, precise, flawless.',
+            effects:{nerve:8, fortune:5},
+            result:`You execute perfectly — every note placed, every move landed. The panel makes notes. No one gasps, but no one frowns either. Safe, you think, walking off. Safe is a floor. You wonder, all the way home, where the ceiling is.` },
+          { id:'b', text:'Attempt the impossible — the high note no trainee has ever landed live.',
+            effects:{fortune:12, nerve:-6, health:-4},
+            result:`You go for it. The note hangs in the air like a held breath — and lands, pure and impossible, and one evaluator actually stands up. Your voice is shredded for three days after. Worth it? The panel's faces say yes. Your throat files a formal complaint.` }
+        ]}
+    ],
+    events:[
+      { id:'p1e1', title:'The sasaeng', text:`A fan has been waiting outside the dorm for six hours in the rain. Not a fan — staff used the other word, the ugly one. She is sixteen, shaking, holding a letter. Security is already moving.`,
+        options:[
+          { id:'a', text:'Take the letter. Thirty seconds of kindness.',
+            effects:{allies:6, nerve:-4},
+            result:`You take the letter and bow, properly, deeply. She cries. Security escorts her away gently. The letter says you got her through her parents' divorce. You keep it in your drawer for years. Fame's first lesson: you are never just singing to a room.` },
+          { id:'b', text:'Let security handle it. Boundaries are survival.',
+            effects:{nerve:5, allies:-4},
+            result:`You keep walking. It is correct. It is policy. It is also the image of her face in the rain that visits you at 4 AM for weeks. Boundaries protect the body. They do not always protect the conscience.` }
+        ]},
+      { id:'p1e2', title:'Mom\'s call', text:`Your mother calls at midnight. She tries to sound casual. She fails. "Your father pretends not to watch your practice videos," she says. "He has watched the turn forty times."`,
+        options:[
+          { id:'a', text:'Talk for an hour. Let her voice refill the tank.',
+            effects:{nerve:8, health:4},
+            result:`You talk until your phone burns your ear — about nothing, about everything, about the neighbor's dog. When you hang up, the dorm feels less like a barracks and more like a bedroom. Homesickness, administered in hourly doses, is medicine.` },
+          { id:'b', text:'Keep it short. "Soon, Mom. After evaluation. I promise."',
+            effects:{nerve:-4, fortune:3},
+            result:`You keep it to five minutes. She understands — she always understands, which somehow makes it worse. You drill for two more hours, fueled by guilt refined into something like jet fuel. It works. It always works. That is the problem.` }
+        ]}
+    ]
+  },
+  {
+    id:'p2', name:'THE CALL',
+    narration:`You debut. Or rather: you are given two different ways to debut, and they lead to two different lives.\n\nOffer one: STARLIGHT Entertainment, the Big Four label. Seven years. A dorm, a stylist, a world tour — and a contract that owns your name, your image, your dating life, and, several lawyers confirm, "the concept of you." Triple the money. Triple the everything.\n\nOffer two: producer Min Jae, indie legend, wants you for a duo. Creative control. Half the pay. A tiny company with a leaky roof and a Grammy on the shelf.\n\nJiwon signed with Starlight yesterday. She cried when she told you. You are still deciding what the tears meant.`,
+    vignettes:[
+      `Two contracts. Two lives. One owns the concept of you; the other leaks when it rains.`,
+      `Jiwon signed yesterday, crying. You are still decoding the tears.`
+    ],
+    choices:[
+      { id:'p2c1', lead:'Two contracts on the table. One pen.',
+        options:[
+          { id:'a', text:'Sign with STARLIGHT. Go big or go home.',
+            effects:{fortune:16, nerve:-6, health:-5}, flags:['signed_brutal'],
+            result:`You sign. The pen is heavy. Within a month you have a stylist, a schedule, and a clause that requires permission to get a haircut. The money is unreal. So is the feeling, at 3 AM in a dorm you do not own, that you have been purchased at a very fair price.` },
+          { id:'b', text:'Sign with Min Jae. Bet on yourself, not the machine.',
+            effects:{allies:10, fortune:-8, nerve:6}, flags:['went_indie'],
+            result:`You sign with the leaky roof. Min Jae looks at the contract like it personally offends him and says, "Good. Now let's make something they can't manufacture." Your bank account weeps. Your soul does vocal warmups.` }
+        ]},
+      { id:'p2c2', lead:'The group is formed. Leadership is decided by the company — or by the members.',
+        options:[
+          { id:'a', text:'Accept the leader role. Someone has to hold the center.',
+            effects:{allies:8, nerve:-5, health:-4}, flags:['is_leader'],
+            result:`You become the leader — the one who apologizes for the group, who mediates the 2 AM fights, who smiles first in every photo. It is exhausting and invisible and the most important job in the building. Leaders, you learn, are just shock absorbers with better lighting.` },
+          { id:'b', text:'Let Rin take it. You\'ll be the backbone, not the face.',
+            effects:{allies:6, nerve:4},
+            result:`Rin becomes leader and blooms under it — she was born for the center. You become the group's quiet engine: the harmonies, the late-night talks, the one everyone trusts. Not every vital organ is a face. Some are hearts.` }
+        ]},
+      { id:'p2c3', lead:'A trainee-era photo leaks: you at a birthday party, arm around someone. Dating rumor. The company wants a denial by morning.',
+        options:[
+          { id:'a', text:'Issue the denial. "Just friends." Protect the brand.',
+            effects:{fortune:6, nerve:-6, allies:-4}, flags:['denied_rumor'],
+            result:`The denial goes out, crisp and corporate. The rumor dies. So does something in you — the part that believed your life was yours to narrate. You learn the industry's first commandment: the brand is real; you are the avatar.` },
+          { id:'b', text:'Say nothing. Let the rumor starve without oxygen.',
+            effects:{nerve:4, allies:3},
+            result:`You post a selca and a lyric and nothing else. The rumor, denied no fuel, gutters out in days. Silence, wielded precisely, is also a statement. The company is furious and impressed in equal measure.` }
+        ]}
+    ],
+    events:[
+      { id:'p2e1', title:'The vocal scare', text:`During rehearsal your voice cracks — then vanishes. The doctor says the word every singer fears: nodules. Rest, steroids, or surgery. The comeback showcase is in ten days.`,
+        options:[
+          { id:'a', text:'Full vocal rest. Cancel everything. The voice is the career.',
+            effects:{health:12, fortune:-8},
+            result:`You go silent for two weeks — not a word, communicating in a little whiteboard like a mime with a mortgage. The showcase is postponed. Your voice returns, clear as glass. The label is furious. Your vocal cords do not care about the label's feelings.` },
+          { id:'b', text:'Steroid shot. Perform through it. The show must go on.',
+            effects:{health:-12, fortune:8, nerve:5},
+            result:`The shot works miracles for exactly one showcase — you are incandescent — and then the bill comes due in weeks of hoarseness. The clip goes viral. Millions of views. Your throat's review is less enthusiastic.` }
+        ]},
+      { id:'p2e2', title:'Sunbae\'s advice', text:`A second-generation sunbae — a legend, now retired at 31 — finds you backstage. "They will try to make you eternal," she says. "Decide now what you want to be instead. Eternal is a cage with good lighting."`,
+        options:[
+          { id:'a', text:'Ask her what she chose. Listen like your life depends on it.',
+            effects:{nerve:8, allies:4},
+            result:`"I chose to be a person," she says simply. "On my own schedule." She gives you her number and tells you to call when the machine starts eating. You save it under "Emergency." It becomes the most important contact in your phone.` },
+          { id:'b', text:'Smile politely. Legends don\'t understand the current game.',
+            effects:{fortune:4, nerve:-3},
+            result:`You smile and excuse yourself — schedules, you know. Her eyes follow you with something like pity. Years later, at your lowest, you will remember this conversation with the particular pain of ignored prophecies.` }
+        ]}
+    ]
+  },
+  {
+    id:'p3', name:'THE DESCENT',
+    narration:`Year two. The schedule is a rumor and sleep is a myth.\n\nEighteen-hour days. A dating ban with the moral force of scripture. Comeback after comeback, each one needing to outdo the last, because the algorithm does not remember yesterday's miracle. Your body is a company asset. Your face is a quarterly report.\n\nRin — your leader, your friend, the one who blooms in the center — has started crying in the van between schedules and pretending it is allergies. Everyone pretends with her. The pretending is the heaviest part.`,
+    vignettes:[
+      `Eighteen-hour days. The algorithm does not remember yesterday's miracle.`,
+      `Rin cries in the van and calls it allergies. Everyone pretends. The pretending is the heaviest part.`
+    ],
+    choices:[
+      { id:'p3c1', lead:'Rin breaks down an hour before the music show. She cannot go on.',
+        options:[
+          { id:'a', text:'Cover for her. Tell the manager she\'s with you, buy her time.',
+            effects:{allies:12, health:-8, nerve:-3}, flags:['protected_rin'],
+            result:`You tell the manager Rin is doing emergency vocal warmups with you — a lie, delivered with leader-grade calm. She sleeps twenty minutes on your shoulder while you hum. She performs like a comet that night. After, she holds your hand all the way home and says nothing, which says everything.` },
+          { id:'b', text:'Report it. The manager needs to know; the show needs a professional.',
+            effects:{allies:-12, fortune:6, nerve:-4},
+            result:`You report her. It is correct. It is professional. Rin is pulled from the lineup and "rested" — the industry word for shelved — and when she returns, she is polished and distant, like a photo of someone you knew. Correctness, you learn, is a cold blanket.` }
+        ]},
+      { id:'p3c2', lead:'The dating ban. And then — a person. A real one, who makes you laugh like a trainee again.',
+        options:[
+          { id:'a', text:'End it before it starts. The contract is clear.',
+            effects:{nerve:-8, fortune:5},
+            result:`You end it with a speech about timing that you do not believe. They nod, understanding, which is worse than anger. You throw yourself into work and the work rewards you and the reward tastes like the speech: correct and hollow.` },
+          { id:'b', text:'Keep it secret. Masks, back doors, burner phones — the full spy movie.',
+            effects:{nerve:6, health:-5}, flags:['secret_love'],
+            result:`You become a professional secret-keeper: the masks, the separate cars, the phone with no name in it. It is exhausting and terrifying and the only hours of your week that feel like yours. Love, under a dating ban, tastes like stolen fruit — which is to say, like the best thing you have ever eaten.` }
+        ]},
+      { id:'p3c3', lead:'The comeback concept meeting. The company wants the sexy concept. You hate it. Min Jae\'s demo — the artistic one — is better.',
+        options:[
+          { id:'a', text:'Fight for the artistic concept. Bring data, bring passion, bring allies.',
+            req:{stat:'allies', min:55}, effects:{fortune:10, nerve:8, allies:5}, flags:['artistic_win'],
+            result:`You walk in with streaming data, fan poll numbers, and Rin backing you up. The executives fold. The artistic comeback drops — and becomes the defining work of your career, the one they will play at your Hall of Fame induction. Art, argued well, is also commerce. Who knew.` },
+          { id:'b', text:'Fight for it alone, without the leverage. Pure conviction.',
+            req:{notstat:'allies', min:55}, effects:{nerve:-6, fortune:-6},
+            result:`You fight alone, with only conviction as your evidence. Conviction loses to spreadsheets. The sexy concept ships. It does fine — everything does fine — and you perform it with a smile so professional it should win an award. It does not win you anything.` },
+          { id:'c', text:'Accept the company concept. Pick your battles.',
+            effects:{fortune:8, nerve:-4},
+            result:`You accept the concept and execute it flawlessly. It charts. The stylists are thrilled. In the mirror, between takes, you practice the expression you will wear for the next several years: radiant, and slightly elsewhere.` }
+        ]}
+    ],
+    events:[
+      { id:'p3e1', title:'The comment section', text:`At 3 AM you do the thing you swore never to do: you read the comments. Thousands of them. Most are love. Your eyes find the cruel ones like a tongue finds a sore tooth. "Overrated." "Plastic." "She can't sing."`,
+        options:[
+          { id:'a', text:'Close the phone. Call the sunbae\'s emergency number.',
+            effects:{nerve:9, health:3},
+            result:`You call the number saved under "Emergency." She answers on the second ring, at 3 AM, like she was waiting. "Read me the worst one," she says. You do. She laughs — kindly — and dismantles it word by word until it is just pixels. "Eternal is a cage," she reminds you. "Be a person." You sleep.` },
+          { id:'b', text:'Keep reading. Know thine enemy.',
+            effects:{nerve:-10, health:-6},
+            result:`You read for two hours. The cruel ones carve grooves; the kind ones slide off like rain. By dawn you hate your face, your voice, your everything — all based on the opinions of strangers with anime avatars. The algorithm got its engagement. You got the bill.` }
+        ]},
+      { id:'p3e2', title:'The fan letter', text:`A letter, handwritten, no return address: "Your song got me through chemo. I danced in the hospital hallway when you won. My mom cried. Thank you for being loud when I couldn't be."`,
+        options:[
+          { id:'a', text:'Write back. A real letter, by hand.',
+            effects:{allies:8, nerve:6},
+            result:`You write back by hand — two pages, no PR team, no filter. Months later, at a fansign, a girl in remission shows you the letter, laminated. "You wrote back," she whispers, like it is impossible. It was the easiest thing you did all year. It was the only thing that mattered.` },
+          { id:'b', text:'Have the staff send a signed photo. The schedule allows nothing more.',
+            effects:{fortune:3, allies:-3, nerve:-3},
+            result:`The staff sends a signed photo. Efficient. Professional. The letter goes in a drawer. Years later you will find it and read it again and feel the exact weight of what "the schedule allows." Some drawers are heavier than others.` }
+        ]}
+    ]
+  },
+  {
+    id:'p4', name:'THE TURN',
+    narration:`Midnight. Your phone lights up like a distress flare.\n\nAn exposé has dropped — the big one, the kind with a countdown timer and a comment section already at six figures. Leaked footage: you, breaking the dating ban / the company's "wellness" room with its IV drips and locked doors / Rin, crying in the van, filmed through a window. The details blur. The shape is clear: the machine is showing its gears, and you are caught in them.\n\nBy 1 AM, the company has a statement ready: deny everything. By 2 AM, the press conference is scheduled. By 3 AM, you are standing in a hotel bathroom, staring at a face the whole country is currently discussing, and you have to decide who that face belongs to.`,
+    vignettes:[
+      `Midnight. The exposé drops. By 3 AM you are staring at a face the whole country is discussing.`,
+      `The company has a denial ready. The truth has nothing ready. The truth never does.`
+    ],
+    choices:[
+      { id:'p4c1', lead:'The press conference. Cameras. Your move.',
+        options:[
+          { id:'a', text:'Confess openly. Tell the whole truth, live, unscripted.',
+            effects:{nerve:12, allies:10, fortune:-12}, flags:['confessed'],
+            result:`You walk out without the company script and tell the truth — the dating ban, the IV room, all of it — looking straight into the lenses. The room goes silent in a way you will never forget. By evening, the hashtag is the top trend in twelve countries, and it is not hate. It is something rarer: belief. You told the truth. The truth, it turns out, also trends.` },
+          { id:'b', text:'Read the company denial. Protect the machine that made you.',
+            effects:{fortune:8, nerve:-10, allies:-8}, flags:['denied'],
+            result:`You read the denial in a steady voice. Every word is a small death. The scandal fades — denials work, depressingly well — but the comments know. "She's reading." "Blinking twice." You keep your career and lose the plot. The machine hums on, well-fed.` },
+          { id:'c', text:'Quit, live on air. "I resign from being a product."',
+            effects:{nerve:14, fortune:-18, allies:12}, flags:['quit_live'],
+            result:`You look into the camera and resign — from the contract, the concept, the cage with good lighting. The hosts don't know where to look. By morning, #SheResigned is everywhere, and so are the indie labels, the film directors, the talk shows. You are unemployed and, for the first time in years, unowned. It feels like the first breath after a long dive.` }
+        ]},
+      { id:'p4c2', lead:'The fallout needs a shape. Someone has to carry it.',
+        options:[
+          { id:'a', text:'Take the fall alone. Shield Rin and the members completely.',
+            effects:{allies:14, fortune:-8, nerve:6}, flags:['took_fall'],
+            result:`You stand alone at the second press conference and absorb everything — every question, every accusation, every flash. The members watch from the wings, crying. Rin mouths "thank you" through the glass. Leaders, you think, are shock absorbers. You absorb. They survive. That was always the job.` },
+          { id:'b', text:'Point at the company. Name the system, not just the symptoms.',
+            req:{stat:'nerve', min:55}, effects:{nerve:10, allies:8, fortune:-10}, flags:['named_system'],
+            result:`With your nerve holding like a held note, you name it all — the contracts, the IV room, the ban — not as gossip but as testimony. Other idols start talking. Then actors. Then trainees. What you started, carefully and at great personal cost, becomes a reckoning the industry cannot unhear.` },
+          { id:'c', text:'Say as little as possible. Let the lawyers choreograph this.',
+            effects:{fortune:4, nerve:-6, allies:-6},
+            result:`The lawyers choreograph a masterpiece of nothing-said. The scandal becomes a footnote. So, gradually, do you — the idol who survived by saying nothing, remembered for nothing said. Silence kept your career. It could not keep your story.` }
+        ]}
+    ],
+    events:[
+      { id:'p4e1', title:'Jiwon\'s call', text:`Jiwon calls — Jiwon, who signed with Starlight all those years ago, who debuted, who burned out, who left. "Whatever you decide tonight," she says, "decide it for the trainee in the mirror at 4 AM. She's the only one who has to live with it."`,
+        options:[
+          { id:'a', text:'"Thank you. For everything. See you on the other side."',
+            effects:{nerve:7, allies:5},
+            result:`You thank her, and mean it for three years at once. "The other side is nice," she says. "There's sleep. There's food that isn't measured. Come visit." You hang up steadier. Some friendships are load-bearing walls.` },
+          { id:'b', text:'Ask her if she regrets it. You need to know.',
+            effects:{nerve:-3, fortune:2},
+            result:`"Every day," she says honestly. "And never. Both. That's the honest answer — it can be both." You sit with that. Both. The truth, like the industry, rarely fits in one headline.` }
+        ]}
+    ]
+  },
+  {
+    id:'epilogue', name:'EPILOGUE', epilogue:true,
+    endings:[
+      { id:'ido-tri', title:'The Icon', rank:'gold',
+        when:s=>s.stats.fortune>=58 && s.stats.nerve>=55,
+        text:`Ten years later, they teach your career in entertainment courses — not just the hits, but the press conference, the choices, the way you bent an industry without breaking yourself.\n\nYou headline stadiums on your own terms now: your label, your concepts, your hours. Rin runs the trainee program and does it humanely, because someone finally could. Jiwon produces your records. The machine still exists, but it negotiates with you now, politely, like a reformed villain.\n\nAt the Hall of Fame induction, you play the demo Min Jae recorded in the leaky-roof days. "This," you tell the cameras, "is what I actually sound like." The applause is thunder. Under it, quieter: your own voice, unowned, finally, entirely yours.` },
+      { id:'ido-bit1', title:'Famous, and Hollow', rank:'violet',
+        when:s=>s.flags.includes('signed_brutal') && !s.flags.includes('confessed') && !s.flags.includes('quit_live'),
+        text:`You are one of the most famous faces on the planet. Your face sells perfume, phones, and a particular shade of lipstick named after you.\n\nThe dorm is nicer now. The schedule is worse. At 4 AM, in yet another practice room mirror, you catch yourself counting days in eyeliner — old habits — and you laugh, and it sounds like someone else.\n\nYou won the game everyone told you to play. Some nights, in the van between schedules, you wonder who you would have been if you had played a different one. The wondering is the only thing that is entirely yours.` },
+      { id:'ido-bit2', title:'The Quiet Stage', rank:'violet',
+        when:s=>s.flags.includes('went_indie') || s.flags.includes('quit_live'),
+        text:`You play theaters now, not stadiums — two thousand seats, every one of them full of people who know every word.\n\nThe money is enough. The hours are human. You write your own songs about trainee dorms and 4 AM mirrors, and the kids in the front row cry because they are living it now, and your songs are the map.\n\nFame, you learned, is a staircase. You stopped climbing halfway up, sat down on a step with a good view, and watched the sunset. It turns out the view was the point all along.` },
+      { id:'ido-tra', title:'Burnout', rank:'red',
+        when:s=>true,
+        text:`The announcement is three sentences long and breaks twelve million hearts, including, quietly, your own.\n\n"Hiatus." "Health." "Privacy." The words are true and insufficient, like all press releases. The machine replaces you within a quarter — there is always another trainee, another mirror, another 4 AM.\n\nYears later, someone recognizes you in a grocery store and asks what happened. "I was loud for a while," you say, and smile, and it is almost true. In the car, you sit for a moment before driving. The quiet is enormous. The quiet, you are learning, is also a kind of stage.` }
+    ]
+  }]
+};
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const settings = Object.assign({aiMode:false, muted:false}, store.get(LS_SET, {}));
+let G = null;          // active run state
+let busy = false;      // input gate
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ---------- run lifecycle ---------- */
+function newRun(scenarioId){
+  $('event-modal').classList.remove('show');
+  G = { scenarioId, chapterIdx:0, choiceIdx:0,
+        stats:{health:50,nerve:50,allies:50,fortune:50},
+        flags:[], history:[], eventsSeen:[], vignIdx:0 };
+  store.del(LS_SAVE);
+  AudioSys.whoosh(); FX.flash();
+  showScreen('game-screen');
+  renderChapter();
+  saveRun();
+}
+function saveRun(){ if(G) store.set(LS_SAVE, G); }
+function loadRun(){ return store.get(LS_SAVE, null); }
+function clearRun(){ G=null; store.del(LS_SAVE); }
+
+/* ---------- rendering ---------- */
+function scenario(){ return SCENARIOS[G.scenarioId]; }
+function chapter(){ return scenario().chapters[G.chapterIdx]; }
+
+function renderStats(){
+  for(const k of STAT_KEYS){
+    $('num-'+k).textContent = G.stats[k];
+    $('fill-'+k).style.width = G.stats[k]+'%';
+  }
+}
+function renderChapter(){
+  const ch = chapter(), idx = G.chapterIdx;
+  $('chapter-kicker').textContent = 'Chapter '+ROMAN[idx]+' of V';
+  $('chapter-title').textContent = ch.name;
+  $('vignette').innerHTML = '';
+  $('deltas').innerHTML = '';
+  $('result-box').classList.remove('show');
+  if(ch.epilogue){ renderEnding(); return; }
+  $('narration').innerHTML = ch.narration.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('');
+  renderStats();
+  renderChoice();
+  FX.burst(innerWidth/2, innerHeight*0.25, '245,197,24', 36, 3);
+}
+function reqMet(opt){
+  const r = opt.req; if(!r) return {ok:true};
+  if(r.stat && G.stats[r.stat] < r.min) return {ok:false, why:'Requires '+STAT_LABEL[r.stat]+' '+r.min+' (yours: '+G.stats[r.stat]+')'};
+  if(r.notstat && G.stats[r.notstat] >= r.min) return {ok:false, why:'Only when '+STAT_LABEL[r.notstat]+' is below '+r.min};
+  if(r.flags && !r.flags.every(f=>G.flags.includes(f))) return {ok:false, why:'Not available on your path'};
+  if(r.notflags && r.notflags.some(f=>G.flags.includes(f))) return {ok:false, why:'Not available on your path'};
+  return {ok:true};
+}
+function renderChoice(){
+  const ch = chapter();
+  if(G.choiceIdx >= ch.choices.length){ fireEvent(); return; }
+  const c = ch.choices[G.choiceIdx];
+  $('choice-lead').textContent = c.lead;
+  const box = $('choices'); box.innerHTML='';
+  c.options.forEach(opt=>{
+    const b = document.createElement('button');
+    b.className='choice'; b.dataset.optId = opt.id;
+    const chk = reqMet(opt);
+    b.innerHTML = esc(opt.text) + (chk.ok?'':'<span class="lock">🔒 '+esc(chk.why)+'</span>');
+    if(!chk.ok) b.disabled = true;
+    b.onclick = ()=>chooseOption(c, opt);
+    box.appendChild(b);
+  });
+}
+function applyEffects(effects){
+  const deltas = [];
+  for(const k of STAT_KEYS){
+    const d = (effects&&effects[k])||0; if(!d) continue;
+    const before = G.stats[k];
+    G.stats[k] = clamp(before+d, 0, 100);
+    const real = G.stats[k]-before;
+    if(real!==0){
+      deltas.push({k, d:real});
+      const chip = document.createElement('span');
+      chip.className = 'delta '+(real>0?'up':'down');
+      chip.textContent = (real>0?'+':'')+real+' '+STAT_ICON[k]+' '+STAT_LABEL[k];
+      $('deltas').appendChild(chip);
+    }
+  }
+  if(deltas.some(x=>x.d>0)) AudioSys.statUp(); else if(deltas.length) AudioSys.statDown();
+  renderStats();
+}
+function setVignette(html, ai){
+  $('vignette').innerHTML = esc(html) + (ai?'<span class="ai-badge">AI</span>':'');
+}
+function chooseOption(choice, opt){
+  if(busy) return; busy = true;
+  AudioSys.confirm();
+  if(opt.flags) opt.flags.forEach(f=>{ if(!G.flags.includes(f)) G.flags.push(f); });
+  G.history.push({ch:chapter().id, c:choice.id, o:opt.id, t:opt.text.slice(0,80)});
+  $('choices').innerHTML='';
+  $('choice-lead').textContent='';
+  $('deltas').innerHTML='';
+  applyEffects(opt.effects);
+  $('result-text').textContent = opt.result;
+  $('result-box').classList.add('show');
+  // vignette: authored immediately, AI swaps in if it arrives (fire-and-fill)
+  const ch = chapter();
+  const authored = ch.vignettes[G.vignIdx % ch.vignettes.length];
+  G.vignIdx++;
+  setVignette(authored, false);
+  maybeAiVignette(ch, choice, opt, authored);
+  FX.burst(innerWidth/2, innerHeight*0.6, '245,197,24', 14, 2);
+  saveRun();
+  busy = false;
+}
+$('btn-continue').onclick = ()=>{
+  AudioSys.click();
+  $('result-box').classList.remove('show');
+  G.choiceIdx++;
+  renderChoice();
+  saveRun();
+};
+
+/* ---------- events ---------- */
+function fireEvent(){
+  const ch = chapter();
+  const pool = (ch.events||[]).filter(e=>!G.eventsSeen.includes(e.id));
+  if(!pool.length){ nextChapter(); return; }
+  const ev = rnd(pool);
+  G.eventsSeen.push(ev.id);
+  AudioSys.sting();
+  $('event-title').textContent = ev.title;
+  $('event-text').textContent = ev.text;
+  const box = $('event-options'); box.innerHTML='';
+  ev.options.forEach(opt=>{
+    const b=document.createElement('button');
+    b.className='choice'; b.dataset.optId=opt.id; b.textContent=opt.text;
+    b.onclick=()=>{
+      AudioSys.confirm();
+      if(opt.flags) opt.flags.forEach(f=>{ if(!G.flags.includes(f)) G.flags.push(f); });
+      G.history.push({ch:ch.id, c:'event:'+ev.id, o:opt.id, t:opt.text.slice(0,80)});
+      applyEffects(opt.effects);
+      $('event-text').textContent = opt.result;
+      box.innerHTML='';
+      const c=document.createElement('button');
+      c.className='btn primary'; c.textContent='Continue →';
+      c.onclick=()=>{ $('event-modal').classList.remove('show'); AudioSys.click(); nextChapter(); saveRun(); };
+      box.appendChild(c);
+    };
+    box.appendChild(b);
+  });
+  $('event-modal').classList.add('show');
+}
+function nextChapter(){
+  G.chapterIdx++;
+  G.choiceIdx = 0;
+  $('deltas').innerHTML='';
+  AudioSys.whoosh(); FX.flash();
+  renderChapter();
+  saveRun();
+}
+
+/* ---------- endings ---------- */
+function renderEnding(){
+  const ch = chapter();
+  const state = {stats:Object.assign({},G.stats), flags:G.flags.slice()};
+  const ending = ch.endings.find(e=>{ try{return e.when(state);}catch(err){return false;} }) || ch.endings[ch.endings.length-1];
+  $('ending-rank').textContent = ending.rank;
+  $('ending-rank').className = ending.rank==='gold'?'gold':ending.rank==='violet'?'violet':'red';
+  $('ending-title').textContent = ending.title;
+  $('ending-text').innerHTML = ending.text.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('');
+  $('ending-coda').textContent = '';
+  $('ending-stats').innerHTML = STAT_KEYS.map(k=>
+    '<span class="end-chip got '+(ending.rank==='gold'?'gold':ending.rank==='violet'?'violet':'red')+'">'+
+    STAT_ICON[k]+' '+STAT_LABEL[k]+' '+G.stats[k]+'</span>').join('');
+  showScreen('ending-screen');
+  AudioSys.fanfare(ending.rank==='gold'?'gold':ending.rank==='violet'?'violet':'red');
+  FX.rain(ending.rank==='gold'?'245,197,24':ending.rank==='violet'?'167,139,250':'248,113,113', 110);
+  unlockEnding(G.scenarioId, ending);
+  maybeAiCoda(ending);
+  clearRun();
+}
+function unlockEnding(sid, ending){
+  const gal = store.get(LS_END, {});
+  gal[sid] = gal[sid]||[];
+  const isNew = !gal[sid].includes(ending.id);
+  if(isNew){ gal[sid].push(ending.id); store.set(LS_END, gal); }
+  if(isNew) setTimeout(()=>toast('🏆 Ending unlocked: '+ending.title), 1200);
+}
+
+/* ---------- AI storyteller (Puter.js, optional, always fallback) ---------- */
+const AI = { loaded:false, loading:false, fails:0, queue:[] };
+function aiStatus(msg){ $('ai-status').textContent = msg; }
+function ensurePuter(cb){
+  if(AI.loaded){ cb&&cb(); return; }
+  if(cb) AI.queue.push(cb);
+  if(AI.loading) return;
+  AI.loading = true;
+  aiStatus('loading storyteller…');
+  const s = document.createElement('script');
+  s.src = 'https://js.puter.com/v2/';
+  s.onload = ()=>{ AI.loaded=true; AI.loading=false; aiStatus('ready — AI vignettes on'); AI.queue.splice(0).forEach(f=>f()); };
+  s.onerror = ()=>{ AI.loading=false; AI.fails=99; aiStatus('offline — hand-written prose'); AI.queue.splice(0).forEach(f=>f()); };
+  document.head.appendChild(s);
+  setTimeout(()=>{ if(AI.loading && !AI.loaded){ AI.loading=false; AI.fails=99; aiStatus('offline — hand-written prose'); } }, 15000);
+}
+function aiChat(messages, timeoutMs=12000){
+  return new Promise(resolve=>{
+    if(!settings.aiMode || AI.fails>=3 || !AI.loaded){ resolve(null); return; }
+    let done=false;
+    const to=setTimeout(()=>{ if(!done){done=true; AI.fails++; resolve(null);} }, timeoutMs);
+    try{
+      puter.ai.chat(messages).then(r=>{
+        if(done) return; done=true; clearTimeout(to);
+        const t = (r && (r.text || (r.message&&r.message.content&&r.message.content[0]&&r.message.content[0].text))) || '';
+        resolve(t.trim().slice(0,280) || null);
+      }).catch(()=>{ if(!done){done=true; clearTimeout(to); AI.fails++; resolve(null);} });
+    }catch(e){ if(!done){done=true; clearTimeout(to); AI.fails++; resolve(null);} }
+  });
+}
+function vignetteContext(ch, choice, opt){
+  const hist = G.history.slice(-3).map(h=>h.t).join(' | ');
+  return [
+    {role:'system', content:'You are a cinematic second-person narrator for an interactive life story. Write ONE sentence, at most two, present tense, second person ("you"). Lyrical but grounded. Do NOT introduce new plot events, new characters, or decisions — only atmosphere and interior feeling that fits inside this moment: '+ch.name+'. Never break character. No preamble.'},
+    {role:'user', content:'Chapter: '+scenario().title+' — '+ch.name+'. Just happened: you chose "'+opt.text.slice(0,120)+'". Recent story: '+hist+'. Write the vignette sentence.'}
+  ];
+}
+function maybeAiVignette(ch, choice, opt, authored){
+  if(!settings.aiMode) return;
+  ensurePuter(()=>{
+    aiChat(vignetteContext(ch, choice, opt)).then(t=>{
+      if(t && G) setVignette(t, true); // fire-and-fill: swap only if it arrived
+    });
+  });
+}
+function maybeAiCoda(ending){
+  if(!settings.aiMode) return;
+  ensurePuter(()=>{
+    const hist = G_HISTORY_SNAPSHOT;
+    aiChat([
+      {role:'system', content:'You are a cinematic narrator. Write ONE closing line, second person, that echoes the ending titled "'+ending.title+'" without repeating it. Lyrical, final, under 30 words.'},
+      {role:'user', content:'The player\'s journey: '+hist}
+    ]).then(t=>{ if(t) $('ending-coda').textContent = '“'+t+'”'; });
+  });
+}
+let G_HISTORY_SNAPSHOT = '';
+// snapshot history before clearRun wipes it (called in renderEnding before clearRun)
+const _renderEnding = renderEnding;
+renderEnding = function(){
+  G_HISTORY_SNAPSHOT = G ? G.history.slice(-6).map(h=>h.t).join(' → ') : '';
+  _renderEnding();
+};
+
+/* ---------- menu ---------- */
+function endingsFor(sid){ return store.get(LS_END, {})[sid]||[]; }
+function renderMenu(){
+  const list = $('scenario-list'); list.innerHTML='';
+  const saved = loadRun();
+  if(saved && SCENARIOS[saved.scenarioId]){
+    const b=document.createElement('button');
+    b.className='btn primary'; b.id='btn-continue-run'; b.style.cssText='grid-column:1/-1';
+    b.textContent='▶ Continue your '+SCENARIOS[saved.scenarioId].title.replace('Your Life As a ','')+' life';
+    b.onclick=()=>{ AudioSys.click(); G=saved; showScreen('game-screen'); renderChapter(); };
+    list.appendChild(b);
+  }
+  Object.values(SCENARIOS).forEach(sc=>{
+    const got = endingsFor(sc.id);
+    const total = sc.chapters.find(c=>c.epilogue).endings.length;
+    const card=document.createElement('div');
+    card.className='scenario-card'; card.dataset.scenario=sc.id;
+    card.innerHTML='<div class="icon">'+sc.icon+'</div><h3>'+esc(sc.title)+'</h3><p>'+esc(sc.tagline)+'</p><div class="ends">✦ '+got.length+' / '+total+' endings</div>';
+    card.onclick=()=>{ AudioSys.confirm(); newRun(sc.id); };
+    list.appendChild(card);
+  });
+  // gallery
+  const gal=$('gallery'); gal.innerHTML='';
+  Object.values(SCENARIOS).forEach(sc=>{
+    const eps=sc.chapters.find(c=>c.epilogue).endings;
+    const got=endingsFor(sc.id);
+    eps.forEach(e=>{
+      const c=document.createElement('span');
+      const has=got.includes(e.id);
+      c.className='end-chip'+(has?' got '+e.rank:'');
+      c.textContent=(has?'🏆 ':'🔒 ')+e.title;
+      c.title=sc.title;
+      gal.appendChild(c);
+    });
+  });
+  // ai toggle + mute reflect settings
+  $('ai-toggle').classList.toggle('on', settings.aiMode);
+  $('ai-toggle').setAttribute('aria-checked', settings.aiMode);
+  if(settings.aiMode) ensurePuter(); else aiStatus('off — hand-written prose');
+  updateMuteBtn();
+}
+function updateMuteBtn(){ $('mute-btn').textContent = settings.muted ? '🔇 Sound off' : '🔊 Sound on'; }
+
+$('ai-toggle').onclick = ()=>{
+  AudioSys.ensure(); AudioSys.click();
+  settings.aiMode = !settings.aiMode;
+  store.set(LS_SET, settings);
+  $('ai-toggle').classList.toggle('on', settings.aiMode);
+  $('ai-toggle').setAttribute('aria-checked', settings.aiMode);
+  if(settings.aiMode){ ensurePuter(); toast('✨ AI Storyteller on — vignettes woven from your choices'); }
+  else { aiStatus('off — hand-written prose'); toast('AI Storyteller off'); }
+};
+$('ai-toggle').onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('ai-toggle').click(); } };
+$('mute-btn').onclick = ()=>{
+  settings.muted = !settings.muted;
+  store.set(LS_SET, settings);
+  if(settings.muted) AudioSys.stopAmbient(); else { AudioSys.ensure(); AudioSys.ambient(); }
+  updateMuteBtn(); AudioSys.click();
+};
+$('reset-saves').onclick = ()=>{
+  if(confirm('Erase all progress, endings gallery, and settings?')){
+    store.del(LS_SAVE); store.del(LS_END);
+    toast('All progress erased. A new life awaits.');
+    renderMenu();
+  }
+};
+$('btn-quit').onclick = ()=>{ AudioSys.click(); saveRun(); $('event-modal').classList.remove('show'); showScreen('menu-screen'); renderMenu(); toast('💾 Progress saved'); };
+$('btn-restart').onclick = ()=>{
+  if(confirm('Restart this life from Chapter I?')){ AudioSys.whoosh(); newRun(G.scenarioId); }
+};
+$('btn-again').onclick = ()=>{ AudioSys.confirm(); newRun(G_lastScenario || 'diver'); };
+$('btn-menu').onclick = ()=>{ AudioSys.click(); showScreen('menu-screen'); renderMenu(); };
+let G_lastScenario = 'diver';
+const _newRun = newRun;
+newRun = function(sid){ G_lastScenario = sid; _newRun(sid); };
+
+// first-gesture audio unlock
+document.addEventListener('pointerdown', ()=>{ AudioSys.ensure(); AudioSys.ambient(); });
+
+/* ---------- init ---------- */
+FX.init();
+renderMenu();
+showScreen('menu-screen');
+</script>
+</body>
+</html>
