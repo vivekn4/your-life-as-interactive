@@ -72,6 +72,10 @@ body{overflow-x:hidden}
 #narration{font-family:var(--serif);font-size:clamp(17px,2.6vw,21px);line-height:1.85;color:#efe6cf;
   background:rgba(16,16,24,.72);border-left:3px solid var(--gold);padding:22px 24px;border-radius:0 12px 12px 0;margin:18px 0}
 #narration p{margin:0 0 1em}#narration p:last-child{margin:0}
+.narr-speaking{background:rgba(245,197,24,.07);box-shadow:inset 3px 0 0 var(--gold);border-radius:0 8px 8px 0;transition:background .3s}
+.sel{background:#1d1d26;border:1px solid #3a3a44;color:var(--paper);padding:9px 12px;border-radius:10px;font-size:13px;max-width:230px;font-family:var(--sans)}
+.rate-lbl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.rate-lbl input[type=range]{accent-color:var(--gold);width:110px}
 #vignette{font-family:var(--serif);font-style:italic;color:var(--gold);opacity:.9;font-size:16px;line-height:1.7;
   text-align:center;margin:6px auto 4px;max-width:640px;min-height:1.2em}
 #vignette .ai-badge{font-style:normal;font-size:10px;letter-spacing:.25em;border:1px solid var(--gold-dim);
@@ -154,6 +158,20 @@ body{overflow-x:hidden}
     </div>
     <p class="sub" style="font-size:12.5px;color:var(--muted);margin:10px 0 0">When on, an AI narrator weaves one-line vignettes from <i>your actual choices</i>. The story itself never changes — only the poetry around it. Free, no account, falls back silently if offline.</p>
   </div>
+  <div class="panel">
+    <h2>🎙 Narration</h2>
+    <div class="controls-row">
+      <div class="toggle" id="narr-toggle" role="switch" aria-checked="false" tabindex="0">
+        <div class="pill"></div><span>Voice narration</span>
+      </div>
+      <span id="narr-status">off</span>
+    </div>
+    <div class="controls-row" style="margin-top:10px;gap:12px;flex-wrap:wrap">
+      <select id="voice-sel" class="sel" aria-label="Narration voice"></select>
+      <label class="rate-lbl">Speed <input type="range" id="rate-range" min="0.7" max="1.3" step="0.05" value="1" aria-label="Narration speed"></label>
+    </div>
+    <p class="sub" style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Reads every chapter, choice result, event and ending aloud using your device's built-in voices — free, private, works offline. The passage being read glows gold.</p>
+  </div>
   <div class="controls-row">
     <button class="btn" id="mute-btn">🔊 Sound on</button>
     <button class="btn danger" id="reset-saves">Reset all progress</button>
@@ -181,6 +199,7 @@ body{overflow-x:hidden}
   <div id="result-box"><div id="result-text"></div><button class="btn primary" id="btn-continue">Continue →</button></div>
   <div class="game-bar">
     <button class="btn" id="btn-restart">↺ Restart life</button>
+    <button class="btn" id="narr-btn">🎙 Narration off</button>
     <button class="btn" id="btn-quit">💾 Save &amp; quit</button>
   </div>
   <div id="save-note">progress auto-saves after every choice</div>
@@ -1063,7 +1082,91 @@ SCENARIOS.idol = {
 /* ================================================================
    ENGINE
    ================================================================ */
-const settings = Object.assign({aiMode:false, muted:false}, store.get(LS_SET, {}));
+const settings = Object.assign({aiMode:false, muted:false, narr:false, voiceURI:'', rate:1}, store.get(LS_SET, {}));
+/* ---------- voice narration (Web Speech API: free, built-in, on-device) ---------- */
+const Narr = {
+  on:false, voice:null, voiceURI:'', rate:1, token:0, errStreak:0,
+  get supported(){ try{ return ('speechSynthesis' in window) && ('SpeechSynthesisUtterance' in window); }catch(e){ return false; } },
+  init(){
+    this.on=!!settings.narr; this.voiceURI=settings.voiceURI||''; this.rate=settings.rate||1;
+    if(!this.supported){ const s=$('narr-status'); if(s) s.textContent='not supported in this browser'; const b=$('narr-btn'); if(b) b.disabled=true; return; }
+    const pickVoices=()=>{
+      let vs=[];
+      try{ vs=speechSynthesis.getVoices().filter(v=>v.lang&&v.lang.toLowerCase().indexOf('en')===0); }catch(e){}
+      try{ if(!vs.length) vs=speechSynthesis.getVoices(); }catch(e){}
+      if(!vs.length) return;
+      const v=vs.find(v=>v.voiceURI===this.voiceURI)
+        || vs.find(v=>/google us english|google uk english female|samantha|zira|aria|jenny|guy|david|mark|daniel|karen|moira|tessa/i.test(v.name))
+        || vs[0];
+      this.voice=v; this.voiceURI=v.voiceURI;
+      const sel=$('voice-sel');
+      if(sel&&!sel.options.length) vs.forEach(vv=>{ const o=document.createElement('option'); o.value=vv.voiceURI; o.textContent=vv.name+' ('+vv.lang+')'; sel.appendChild(o); });
+      if(sel) sel.value=this.voiceURI;
+      this.save();
+    };
+    try{ pickVoices(); if(typeof speechSynthesis.onvoiceschanged!=='undefined') speechSynthesis.onvoiceschanged=pickVoices; }catch(e){}
+    this.syncUI();
+    window.addEventListener('beforeunload', ()=>{ try{ speechSynthesis.cancel(); }catch(e){} });
+  },
+  save(){ settings.narr=this.on; settings.voiceURI=this.voiceURI; settings.rate=this.rate; store.set(LS_SET, settings); },
+  syncUI(){
+    const t=$('narr-toggle'); if(t){ t.classList.toggle('on',this.on); t.setAttribute('aria-checked',this.on); }
+    const s=$('narr-status'); if(s&&this.supported) s.textContent=this.on?('on'+(this.voice?' · '+this.voice.name.split(' (')[0].slice(0,26):'')):'off';
+    const b=$('narr-btn'); if(b) b.textContent=this.on?'🎙 Narration on':'🎙 Narration off';
+    const r=$('rate-range'); if(r) r.value=this.rate;
+  },
+  toggle(){
+    if(!this.supported){ toast('🎙 Voice narration is not supported in this browser'); return false; }
+    this.on=!this.on;
+    if(!this.on) this.stop();
+    this.save(); this.syncUI();
+    toast(this.on?'🎙 Narration on — the story will read itself aloud':'🎙 Narration off');
+    return this.on;
+  },
+  setVoice(uri){ this.voiceURI=uri; try{ const v=speechSynthesis.getVoices().find(v=>v.voiceURI===uri); if(v) this.voice=v; }catch(e){} this.save(); this.syncUI(); },
+  setRate(r){ this.rate=r; this.save(); this.syncUI(); },
+  clearHi(){ document.querySelectorAll('.narr-speaking').forEach(e=>e.classList.remove('narr-speaking')); },
+  hi(el){ this.clearHi(); if(!el) return; el.classList.add('narr-speaking'); try{ el.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(e){} },
+  stop(){ this.token++; this.errStreak=0; try{ speechSynthesis.cancel(); }catch(e){} this.clearHi(); },
+  speakList(items){
+    this.stop();
+    if(!this.on||!this.supported||!items||!items.length) return;
+    const token=++this.token;
+    let i=0;
+    const next=()=>{
+      if(token!==this.token) return;
+      if(i>=items.length){ this.clearHi(); return; }
+      const it=items[i++];
+      if(!it.text||!it.text.trim()){ next(); return; }
+      this.hi(it.el);
+      let u;
+      try{ u=new SpeechSynthesisUtterance(it.text); if(this.voice) u.voice=this.voice; u.rate=this.rate; u.pitch=1; }
+      catch(e){ next(); return; }
+      u.onend=()=>{ this.errStreak=0; if(token===this.token) next(); };
+      u.onerror=()=>{ this.errStreak++; if(this.errStreak>2||token!==this.token){ this.clearHi(); return; } next(); };
+      try{ speechSynthesis.speak(u); }catch(e){ next(); }
+    };
+    next();
+  },
+  speakNarration(){
+    if(!this.on) return;
+    const ps=Array.prototype.slice.call(document.querySelectorAll('#narration p'));
+    this.speakList(ps.map(el=>({el:el, text:el.textContent})));
+  },
+  speakEl(id){
+    if(!this.on) return;
+    const el=$(id); if(!el) return;
+    const t=el.textContent; if(!t||!t.trim()) return;
+    this.speakList([{el:el, text:t}]);
+  },
+  speakEnding(){
+    if(!this.on) return;
+    const items=[];
+    const title=$('ending-title'); if(title&&title.textContent.trim()) items.push({el:title, text:title.textContent});
+    Array.prototype.forEach.call(document.querySelectorAll('#ending-text p'), el=>{ if(el.textContent.trim()) items.push({el:el, text:el.textContent}); });
+    this.speakList(items);
+  }
+};
 let G = null;          // active run state
 let busy = false;      // input gate
 
@@ -1108,6 +1211,7 @@ function renderChapter(){
   $('result-box').classList.remove('show');
   if(ch.epilogue){ renderEnding(); return; }
   $('narration').innerHTML = ch.narration.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('');
+  Narr.speakNarration();
   renderStats();
   renderChoice();
   FX.burst(innerWidth/2, innerHeight*0.25, '245,197,24', 36, 3);
@@ -1159,6 +1263,7 @@ function setVignette(html, ai){
 }
 function chooseOption(choice, opt){
   if(busy) return; busy = true;
+  Narr.stop();
   AudioSys.confirm();
   if(opt.flags) opt.flags.forEach(f=>{ if(!G.flags.includes(f)) G.flags.push(f); });
   G.history.push({ch:chapter().id, c:choice.id, o:opt.id, t:opt.text.slice(0,80)});
@@ -1175,11 +1280,13 @@ function chooseOption(choice, opt){
   setVignette(authored, false);
   maybeAiVignette(ch, choice, opt, authored);
   FX.burst(innerWidth/2, innerHeight*0.6, '245,197,24', 14, 2);
+  Narr.speakEl('result-text');
   saveRun();
   busy = false;
 }
 $('btn-continue').onclick = ()=>{
   AudioSys.click();
+  Narr.stop();
   $('result-box').classList.remove('show');
   G.choiceIdx++;
   renderChoice();
@@ -1206,6 +1313,7 @@ function fireEvent(){
       G.history.push({ch:ch.id, c:'event:'+ev.id, o:opt.id, t:opt.text.slice(0,80)});
       applyEffects(opt.effects);
       $('event-text').textContent = opt.result;
+      Narr.speakEl('event-text');
       box.innerHTML='';
       const c=document.createElement('button');
       c.className='btn primary'; c.textContent='Continue →';
@@ -1214,6 +1322,7 @@ function fireEvent(){
     };
     box.appendChild(b);
   });
+  if(Narr.on){ const t=$('event-title').textContent+' \u2014 '+$('event-text').textContent; Narr.speakList([{el:$('event-text'), text:t}]); }
   $('event-modal').classList.add('show');
 }
 function nextChapter(){
@@ -1242,6 +1351,7 @@ function renderEnding(){
   AudioSys.fanfare(ending.rank==='gold'?'gold':ending.rank==='violet'?'violet':'red');
   FX.rain(ending.rank==='gold'?'245,197,24':ending.rank==='violet'?'167,139,250':'248,113,113', 110);
   unlockEnding(G.scenarioId, ending);
+  Narr.speakEnding();
   maybeAiCoda(ending);
   clearRun();
 }
@@ -1355,6 +1465,7 @@ function renderMenu(){
   $('ai-toggle').classList.toggle('on', settings.aiMode);
   $('ai-toggle').setAttribute('aria-checked', settings.aiMode);
   if(settings.aiMode) ensurePuter(); else aiStatus('off — hand-written prose');
+  Narr.syncUI();
   updateMuteBtn();
 }
 function updateMuteBtn(){ $('mute-btn').textContent = settings.muted ? '🔇 Sound off' : '🔊 Sound on'; }
@@ -1369,6 +1480,12 @@ $('ai-toggle').onclick = ()=>{
   else { aiStatus('off — hand-written prose'); toast('AI Storyteller off'); }
 };
 $('ai-toggle').onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('ai-toggle').click(); } };
+Narr.init();
+$('narr-toggle').onclick = ()=>{ AudioSys.ensure(); AudioSys.click(); const on=Narr.toggle(); if(on&&G) Narr.speakNarration(); };
+$('narr-toggle').onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('narr-toggle').click(); } };
+$('voice-sel').onchange = e=>Narr.setVoice(e.target.value);
+$('rate-range').oninput = e=>Narr.setRate(parseFloat(e.target.value));
+$('narr-btn').onclick = ()=>{ AudioSys.ensure(); AudioSys.click(); const on=Narr.toggle(); if(on&&G) Narr.speakNarration(); };
 $('mute-btn').onclick = ()=>{
   settings.muted = !settings.muted;
   store.set(LS_SET, settings);
@@ -1382,12 +1499,12 @@ $('reset-saves').onclick = ()=>{
     renderMenu();
   }
 };
-$('btn-quit').onclick = ()=>{ AudioSys.click(); saveRun(); $('event-modal').classList.remove('show'); showScreen('menu-screen'); renderMenu(); toast('💾 Progress saved'); };
+$('btn-quit').onclick = ()=>{ AudioSys.click(); Narr.stop(); saveRun(); $('event-modal').classList.remove('show'); showScreen('menu-screen'); renderMenu(); toast('💾 Progress saved'); };
 $('btn-restart').onclick = ()=>{
   if(confirm('Restart this life from Chapter I?')){ AudioSys.whoosh(); newRun(G.scenarioId); }
 };
 $('btn-again').onclick = ()=>{ AudioSys.confirm(); newRun(G_lastScenario || 'diver'); };
-$('btn-menu').onclick = ()=>{ AudioSys.click(); showScreen('menu-screen'); renderMenu(); };
+$('btn-menu').onclick = ()=>{ AudioSys.click(); Narr.stop(); showScreen('menu-screen'); renderMenu(); };
 let G_lastScenario = 'diver';
 const _newRun = newRun;
 newRun = function(sid){ G_lastScenario = sid; _newRun(sid); };
