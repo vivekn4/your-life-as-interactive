@@ -89,6 +89,15 @@ body{overflow-x:hidden}
   box-shadow:0 6px 24px rgba(245,197,24,.18);transform:translateX(6px)}
 .choice:disabled{opacity:.45;cursor:not-allowed}
 .choice .lock{font-size:12px;color:var(--red);display:block;margin-top:6px}
+.choice .preview{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.choice .pv{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;letter-spacing:.04em}
+.choice .pv.up{color:#7ee2a8;background:rgba(126,226,168,.12);border:1px solid rgba(126,226,168,.35)}
+.choice .pv.down{color:#f0a3a3;background:rgba(226,109,109,.12);border:1px solid rgba(226,109,109,.35)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.ach-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.ach-chip{font-size:12px;padding:5px 11px;border-radius:99px;border:1px solid #34343e;color:var(--muted)}
+.ach-chip.got{color:#ffe9a3;border-color:var(--gold-dim);background:rgba(245,197,24,.08)}
+.cp-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 #deltas{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0;min-height:30px}
 .delta{font-size:13px;font-weight:700;padding:5px 12px;border-radius:99px;animation:pop .5s ease}
 .delta.up{color:#0d0d12;background:#7ee2a8}.delta.down{color:#fff;background:#e26d6d}
@@ -149,6 +158,11 @@ body{overflow-x:hidden}
     <div class="gallery-row" id="gallery"></div>
   </div>
   <div class="panel">
+    <h2>🏅 Achievements</h2>
+    <div class="ach-row" id="achievements"></div>
+    <div id="checkpoint-row"><div class="cp-row" id="checkpoints"></div></div>
+  </div>
+  <div class="panel">
     <h2>Storyteller</h2>
     <div class="controls-row">
       <div class="toggle" id="ai-toggle" role="switch" aria-checked="false" tabindex="0">
@@ -198,6 +212,7 @@ body{overflow-x:hidden}
   <div id="deltas"></div>
   <div id="result-box"><div id="result-text"></div><button class="btn primary" id="btn-continue">Continue →</button></div>
   <div class="game-bar">
+    <button class="btn" id="btn-undo">↩ Undo choice</button>
     <button class="btn" id="btn-restart">↺ Restart life</button>
     <button class="btn" id="narr-btn">🎙 Narration off</button>
     <button class="btn" id="btn-quit">💾 Save &amp; quit</button>
@@ -253,6 +268,9 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
 // ---------- storage ----------
 const LS_SAVE='yla_interactive_save_v1', LS_END='yla_interactive_endings_v1', LS_SET='yla_interactive_settings_v1';
+const LS_CHECK='yla_interactive_checkpoints_v1', LS_ACH='yla_interactive_achievements_v1';
+const SAVE_VER = 2; // v2 adds undo/checkpoint/achievement support; old v1 saves migrate in normalizeRun()
+const MAX_UNDO = 10, MAX_CHECKPOINTS = 3;
 const store = {
   get(k, fb){ try{ const v = localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
@@ -415,7 +433,7 @@ SCENARIOS.diver = {
             effects:{allies:8, nerve:3},
             result:`You lose spectacularly. Your true story is about the first time you saw the ocean and understood, at age nine, that you would spend your life trying to get under it. Mara listens all the way through. Her story, when it comes, is about a bell that did not come back up in '09. She does not finish it. She does not need to.` },
           { id:'b', text:'Sleep. Rest is equipment too.',
-            effects:{health:8, nerve:4},
+            fm:{health:14, nerve:8},
             result:`You sleep twelve hours straight, the deep dreamless kind. You wake with your body humming like a tuned cable — ready, rested, a fraction more alive than yesterday.` }
         ]}
     ]
@@ -466,7 +484,7 @@ SCENARIOS.diver = {
             effects:{fortune:-10, nerve:8, allies:4},
             result:`You wire the money before you can do the math. She calls, crying, and you stand in an Aberdeen phone box feeling richer than triple pay ever made you. Some ledgers are not kept in banks.` },
           { id:'b', text:'Keep it. You\'ll need every penny where you\'re going.',
-            effects:{fortune:6, nerve:-6},
+            fm:{fortune:12, nerve:-12},
             result:`You keep the money. The number in your account is comforting in the exact way a locked door is comforting — it keeps things out, including, you notice, your own sleep.` }
         ]},
       { id:'d2e2', title:'The old diver\'s warning', text:`At the dock you meet a man with a ruined knee and a stare that has seen the bottom. "Wreck diving," he says, "is just regular diving, except the building is trying to kill you and nobody is watching."`,
@@ -1176,12 +1194,134 @@ function showScreen(id){
   window.scrollTo(0,0);
 }
 
+/* ---------- save migration (v1 -> v2) ---------- */
+function normalizeRun(g){
+  if(!g) return g;
+  g.ver = SAVE_VER;
+  if(!g.stats) g.stats = {health:50,nerve:50,allies:50,fortune:50};
+  STAT_KEYS.forEach(k=>{ if(typeof g.stats[k] !== 'number') g.stats[k] = 50; g.stats[k] = clamp(g.stats[k], 0, 100); });
+  if(!Array.isArray(g.flags)) g.flags = [];
+  if(!Array.isArray(g.history)) g.history = [];
+  if(!Array.isArray(g.eventsSeen)) g.eventsSeen = [];
+  if(typeof g.vignIdx !== 'number') g.vignIdx = 0;
+  if(typeof g.chapterIdx !== 'number') g.chapterIdx = 0;
+  if(typeof g.choiceIdx !== 'number') g.choiceIdx = 0;
+  return g;
+}
+
+/* ---------- fairmath (diminishing-returns stat deltas) ----------
+   A +d change near the top of a stat is worth less than the same
+   change near the bottom, and vice versa for losses: gains scale
+   with headroom, losses scale with what is left. Keeps stats from
+   ping-ponging between 0 and 100 on repeated swings. Opt-in per
+   effect via the `fm` key: effects:{...} stays flat, fm:{...} is fair. */
+function fairDelta(before, d){
+  if(d > 0) return Math.round(d * (100 - before) / 100);
+  if(d < 0) return -Math.round((-d) * before / 100);
+  return 0;
+}
+
+/* ---------- effect-preview chips (direction only, no numbers) ---------- */
+function previewHtml(opt){
+  const parts = [];
+  for(const k of STAT_KEYS){
+    const d = (opt.effects && opt.effects[k]) || 0;
+    const f = (opt.fm && opt.fm[k]) || 0;
+    if(d) parts.push('<span class="pv '+(d>0?'up':'down')+'">'+STAT_ICON[k]+' '+(d>0?'▲':'▼')+'</span>');
+    else if(f) parts.push('<span class="pv '+(f>0?'up':'down')+'">'+STAT_ICON[k]+' ~'+(f>0?'▲':'▼')+'</span>');
+  }
+  return parts.length ? '<span class="preview">'+parts.join('')+'</span>' : '';
+}
+
+/* ---------- undo / rewind (in-memory snapshot stack) ---------- */
+let undoStack = [];
+function snapshotRun(){ try{ return JSON.parse(JSON.stringify(G)); }catch(e){ return null; } }
+function pushUndo(){ const s = snapshotRun(); if(!s) return; undoStack.push(s); if(undoStack.length > MAX_UNDO) undoStack.shift(); syncUndoBtn(); }
+function syncUndoBtn(){ const b = $('btn-undo'); if(b) b.disabled = !undoStack.length; }
+function doUndo(){
+  if(!undoStack.length || busy) return;
+  Narr.stop();
+  const prev = undoStack.pop();
+  const undoTotal = achState().undoTotal + 1;
+  G = normalizeRun(prev);
+  $('event-modal').classList.remove('show');
+  $('result-box').classList.remove('show');
+  $('vignette').innerHTML=''; $('deltas').innerHTML='';
+  AudioSys.whoosh(); FX.flash();
+  renderChapter();
+  saveRun(); syncUndoBtn();
+  toast('↩ Rewound — that choice never happened');
+  checkAchievements({undoTotal: undoTotal});
+}
+
+/* ---------- rotating checkpoints (max 3, newest first) ---------- */
+function checkpoints(){ const c = store.get(LS_CHECK, []); return Array.isArray(c) ? c : []; }
+function pushCheckpoint(){
+  if(!G) return;
+  const list = checkpoints();
+  const label = 'Ch '+ROMAN[G.chapterIdx]+' — '+chapter().name;
+  if(list.length && list[0].scenarioId===G.scenarioId && list[0].chapterIdx===G.chapterIdx) return; // no identical consecutive
+  list.unshift({at: Date.now(), scenarioId: G.scenarioId, chapterIdx: G.chapterIdx, label: label, state: snapshotRun()});
+  store.set(LS_CHECK, list.slice(0, MAX_CHECKPOINTS));
+}
+function renderCheckpoints(){
+  const box = $('checkpoints'); if(!box) return;
+  box.innerHTML = '';
+  checkpoints().forEach(cp=>{
+    const sc = SCENARIOS[cp.scenarioId]; if(!sc || !cp.state) return;
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = '↩ Checkpoint · '+sc.title.replace('Your Life As a ','')+' · '+cp.label+' · '+new Date(cp.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    b.onclick = ()=>{ AudioSys.click(); G = normalizeRun(cp.state); undoStack = []; showScreen('game-screen'); renderChapter(); saveRun(); syncUndoBtn(); toast('↩ Checkpoint restored'); };
+    box.appendChild(b);
+  });
+}
+
+/* ---------- achievements ---------- */
+const ACHIEVEMENTS = [
+  {id:'second_thoughts', icon:'↩', title:'Second Thoughts', desc:'Use Undo once', when:(s,ctx)=> (ctx.undoTotal||0) >= 1},
+  {id:'what_if', icon:'🌀', title:'What If?', desc:'Use Undo 3 times', when:(s,ctx)=> (ctx.undoTotal||0) >= 3},
+  {id:'on_the_edge', icon:'🩸', title:'On the Edge', desc:'Survive with a stat at 10 or below', when:(s)=> STAT_KEYS.some(k=>s.stats[k] <= 10)},
+  {id:'silver_tongue', icon:'🤝', title:'Silver Tongue', desc:'Reach 85 Allies', when:(s)=> s.stats.allies >= 85},
+  {id:'high_roller', icon:'💰', title:'High Roller', desc:'Reach 85 Fortune', when:(s)=> s.stats.fortune >= 85},
+  {id:'iron_will', icon:'⚡', title:'Iron Will', desc:'Reach 85 Nerve', when:(s)=> s.stats.nerve >= 85},
+  {id:'untouchable', icon:'🛡', title:'Untouchable', desc:'Finish a life with every stat at 70+', when:(s,ctx)=> !!ctx.atEnding && STAT_KEYS.every(k=>s.stats[k] >= 70)},
+  {id:'collector', icon:'🏆', title:'Collector', desc:'Unlock 5 endings', when:(s,ctx)=> (ctx.endingsTotal||0) >= 5}
+];
+function achState(){ const a = store.get(LS_ACH, {}); return {unlocked: Array.isArray(a.unlocked)?a.unlocked:[], undoTotal: a.undoTotal||0}; }
+function checkAchievements(ctx){
+  ctx = ctx || {};
+  const st = achState();
+  if(ctx.undoTotal != null) st.undoTotal = Math.max(st.undoTotal, ctx.undoTotal);
+  const s = G ? {stats: Object.assign({}, G.stats), flags: G.flags.slice()}
+              : {stats:{health:50,nerve:50,allies:50,fortune:50}, flags:[]};
+  if(ctx.endingsTotal == null){ const gal = store.get(LS_END, {}); ctx.endingsTotal = Object.values(gal).reduce((n,a)=>n+(a?a.length:0),0); }
+  const fullCtx = {undoTotal: st.undoTotal, endingsTotal: ctx.endingsTotal, atEnding: !!ctx.atEnding};
+  let changed = false;
+  ACHIEVEMENTS.forEach(a=>{
+    if(st.unlocked.includes(a.id)) return;
+    let ok = false; try{ ok = !!a.when(s, fullCtx); }catch(e){ ok = false; }
+    if(ok){ st.unlocked.push(a.id); changed = true; setTimeout(()=>{ toast('🏅 Achievement: '+a.title+' — '+a.desc); try{ AudioSys.statUp(); }catch(e){} }, 700); }
+  });
+  if(changed || ctx.undoTotal != null) store.set(LS_ACH, st);
+  renderAchievements();
+}
+function renderAchievements(){
+  const box = $('achievements'); if(!box) return;
+  const st = achState();
+  box.innerHTML = ACHIEVEMENTS.map(a=>{
+    const got = st.unlocked.includes(a.id);
+    return '<span class="ach-chip'+(got?' got':'')+'" title="'+esc(a.desc)+'">'+(got?a.icon+' '+esc(a.title):'🔒 '+esc(a.title))+'</span>';
+  }).join('') + '<span class="ach-chip">'+st.unlocked.length+' / '+ACHIEVEMENTS.length+'</span>';
+}
+
 /* ---------- run lifecycle ---------- */
 function newRun(scenarioId){
   $('event-modal').classList.remove('show');
-  G = { scenarioId, chapterIdx:0, choiceIdx:0,
+  G = { ver:SAVE_VER, scenarioId, chapterIdx:0, choiceIdx:0,
         stats:{health:50,nerve:50,allies:50,fortune:50},
         flags:[], history:[], eventsSeen:[], vignIdx:0 };
+  undoStack = []; syncUndoBtn();
   store.del(LS_SAVE);
   AudioSys.whoosh(); FX.flash();
   showScreen('game-screen');
@@ -1189,7 +1329,7 @@ function newRun(scenarioId){
   saveRun();
 }
 function saveRun(){ if(G) store.set(LS_SAVE, G); }
-function loadRun(){ return store.get(LS_SAVE, null); }
+function loadRun(){ const g = store.get(LS_SAVE, null); return g ? normalizeRun(g) : null; }
 function clearRun(){ G=null; store.del(LS_SAVE); }
 
 /* ---------- rendering ---------- */
@@ -1226,6 +1366,7 @@ function reqMet(opt){
 }
 function renderChoice(){
   const ch = chapter();
+  syncUndoBtn();
   if(G.choiceIdx >= ch.choices.length){ fireEvent(); return; }
   const c = ch.choices[G.choiceIdx];
   $('choice-lead').textContent = c.lead;
@@ -1234,16 +1375,19 @@ function renderChoice(){
     const b = document.createElement('button');
     b.className='choice'; b.dataset.optId = opt.id;
     const chk = reqMet(opt);
-    b.innerHTML = esc(opt.text) + (chk.ok?'':'<span class="lock">🔒 '+esc(chk.why)+'</span>');
+    b.innerHTML = esc(opt.text) + previewHtml(opt) + (chk.ok?'':'<span class="lock">🔒 '+esc(chk.why)+'</span>');
     if(!chk.ok) b.disabled = true;
     b.onclick = ()=>chooseOption(c, opt);
     box.appendChild(b);
   });
 }
-function applyEffects(effects){
+function applyEffects(effects, fm){
   const deltas = [];
   for(const k of STAT_KEYS){
-    const d = (effects&&effects[k])||0; if(!d) continue;
+    let d = (effects&&effects[k])||0;
+    const f = (fm&&fm[k])||0;
+    if(f) d += fairDelta(G.stats[k], f);
+    if(!d) continue;
     const before = G.stats[k];
     G.stats[k] = clamp(before+d, 0, 100);
     const real = G.stats[k]-before;
@@ -1257,6 +1401,7 @@ function applyEffects(effects){
   }
   if(deltas.some(x=>x.d>0)) AudioSys.statUp(); else if(deltas.length) AudioSys.statDown();
   renderStats();
+  if(G) checkAchievements();
 }
 function setVignette(html, ai){
   $('vignette').innerHTML = esc(html) + (ai?'<span class="ai-badge">AI</span>':'');
@@ -1265,12 +1410,13 @@ function chooseOption(choice, opt){
   if(busy) return; busy = true;
   Narr.stop();
   AudioSys.confirm();
+  pushUndo();
   if(opt.flags) opt.flags.forEach(f=>{ if(!G.flags.includes(f)) G.flags.push(f); });
   G.history.push({ch:chapter().id, c:choice.id, o:opt.id, t:opt.text.slice(0,80)});
   $('choices').innerHTML='';
   $('choice-lead').textContent='';
   $('deltas').innerHTML='';
-  applyEffects(opt.effects);
+  applyEffects(opt.effects, opt.fm);
   $('result-text').textContent = opt.result;
   $('result-box').classList.add('show');
   // vignette: authored immediately, AI swaps in if it arrives (fire-and-fill)
@@ -1306,12 +1452,13 @@ function fireEvent(){
   const box = $('event-options'); box.innerHTML='';
   ev.options.forEach(opt=>{
     const b=document.createElement('button');
-    b.className='choice'; b.dataset.optId=opt.id; b.textContent=opt.text;
+    b.className='choice'; b.dataset.optId=opt.id; b.innerHTML=esc(opt.text)+previewHtml(opt);
     b.onclick=()=>{
       AudioSys.confirm();
+      pushUndo();
       if(opt.flags) opt.flags.forEach(f=>{ if(!G.flags.includes(f)) G.flags.push(f); });
       G.history.push({ch:ch.id, c:'event:'+ev.id, o:opt.id, t:opt.text.slice(0,80)});
-      applyEffects(opt.effects);
+      applyEffects(opt.effects, opt.fm);
       $('event-text').textContent = opt.result;
       Narr.speakEl('event-text');
       box.innerHTML='';
@@ -1328,6 +1475,7 @@ function fireEvent(){
 function nextChapter(){
   G.chapterIdx++;
   G.choiceIdx = 0;
+  pushCheckpoint();
   $('deltas').innerHTML='';
   AudioSys.whoosh(); FX.flash();
   renderChapter();
@@ -1339,6 +1487,8 @@ function renderEnding(){
   const ch = chapter();
   const state = {stats:Object.assign({},G.stats), flags:G.flags.slice()};
   const ending = ch.endings.find(e=>{ try{return e.when(state);}catch(err){return false;} }) || ch.endings[ch.endings.length-1];
+  checkAchievements({atEnding:true});
+  undoStack = []; syncUndoBtn();
   $('ending-rank').textContent = ending.rank;
   $('ending-rank').className = ending.rank==='gold'?'gold':ending.rank==='violet'?'violet':'red';
   $('ending-title').textContent = ending.title;
@@ -1361,6 +1511,7 @@ function unlockEnding(sid, ending){
   const isNew = !gal[sid].includes(ending.id);
   if(isNew){ gal[sid].push(ending.id); store.set(LS_END, gal); }
   if(isNew) setTimeout(()=>toast('🏆 Ending unlocked: '+ending.title), 1200);
+  checkAchievements();
 }
 
 /* ---------- AI storyteller (Puter.js, optional, always fallback) ---------- */
@@ -1435,7 +1586,7 @@ function renderMenu(){
     const b=document.createElement('button');
     b.className='btn primary'; b.id='btn-continue-run'; b.style.cssText='grid-column:1/-1';
     b.textContent='▶ Continue your '+SCENARIOS[saved.scenarioId].title.replace('Your Life As a ','')+' life';
-    b.onclick=()=>{ AudioSys.click(); G=saved; showScreen('game-screen'); renderChapter(); };
+    b.onclick=()=>{ AudioSys.click(); G=normalizeRun(saved); undoStack=[]; syncUndoBtn(); showScreen('game-screen'); renderChapter(); };
     list.appendChild(b);
   }
   Object.values(SCENARIOS).forEach(sc=>{
@@ -1461,6 +1612,8 @@ function renderMenu(){
       gal.appendChild(c);
     });
   });
+  renderAchievements();
+  renderCheckpoints();
   // ai toggle + mute reflect settings
   $('ai-toggle').classList.toggle('on', settings.aiMode);
   $('ai-toggle').setAttribute('aria-checked', settings.aiMode);
@@ -1493,13 +1646,15 @@ $('mute-btn').onclick = ()=>{
   updateMuteBtn(); AudioSys.click();
 };
 $('reset-saves').onclick = ()=>{
-  if(confirm('Erase all progress, endings gallery, and settings?')){
-    store.del(LS_SAVE); store.del(LS_END);
+  if(confirm('Erase all progress, endings gallery, checkpoints, achievements, and settings?')){
+    store.del(LS_SAVE); store.del(LS_END); store.del(LS_CHECK); store.del(LS_ACH);
+    undoStack = []; syncUndoBtn();
     toast('All progress erased. A new life awaits.');
     renderMenu();
   }
 };
-$('btn-quit').onclick = ()=>{ AudioSys.click(); Narr.stop(); saveRun(); $('event-modal').classList.remove('show'); showScreen('menu-screen'); renderMenu(); toast('💾 Progress saved'); };
+$('btn-undo').onclick = ()=>{ AudioSys.click(); doUndo(); };
+$('btn-quit').onclick = ()=>{ AudioSys.click(); Narr.stop(); pushCheckpoint(); saveRun(); $('event-modal').classList.remove('show'); showScreen('menu-screen'); renderMenu(); toast('💾 Progress saved'); };
 $('btn-restart').onclick = ()=>{
   if(confirm('Restart this life from Chapter I?')){ AudioSys.whoosh(); newRun(G.scenarioId); }
 };
