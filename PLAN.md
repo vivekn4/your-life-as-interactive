@@ -27,9 +27,14 @@ index.html
 **Engine flow (state machine):**
 `MENU → (pick scenario) → CHAPTER[i] → narration → choice[0..n] → result → … → event → CHAPTER[i+1] … → EPILOGUE → evaluate endings → ENDING → gallery unlock → MENU`
 
-**State object:** `{ scenarioId, chapterIdx, nodeIdx, stats:{health,nerve,allies,fortune}, flags:[], history:[{chapter,choiceId,optionId}], aiMode, endingsSeen }`
-- Persisted run: `yla_interactive_save` (localStorage). Gallery: `yla_interactive_endings` = `{scenarioId:[endingIds]}`. Settings: `yla_interactive_settings` = `{aiMode, muted}`.
-- Stats clamped 0–100, start at 50. Choices apply `effects` deltas + set `flags`. Some options carry `req:{stat,min}` → rendered disabled with lock note.
+**State object:** `{ ver:2, scenarioId, chapterIdx, choiceIdx, stats:{health,nerve,allies,fortune}, flags:[], history:[{ch,c,o,t}], eventsSeen:[], vignIdx }`
+- Persisted run: `yla_interactive_save_v1` (localStorage; `normalizeRun()` migrates old v1 saves by filling defaults + `ver:2`). Gallery: `yla_interactive_endings_v1` = `{scenarioId:[endingIds]}`. Settings: `yla_interactive_settings_v1` = `{aiMode, muted, narr, voiceURI, rate}`. Checkpoints: `yla_interactive_checkpoints_v1` (max 3 snapshots). Achievements: `yla_interactive_achievements_v1` = `{unlocked:[], undoTotal}`.
+- Stats clamped 0–100, start at 50. Choices apply `effects` flat deltas and/or `fm` fairmath deltas + set `flags`. Some options carry `req:{stat,min}` → rendered disabled with lock note.
+- **Undo:** `undoStack` (in-memory only, max 10) holds deep-copy snapshots taken before every choice/event option. Undo restores stats/flags/history/chapter exactly. Undo count persists in achievements state for Second Thoughts / What If?.
+- **Checkpoints:** `pushCheckpoint()` on every chapter transition + Save & Quit; newest-first, max 3, no identical consecutive duplicates. Menu renders one-tap restore buttons.
+- **Achievements (8):** checked after every stat change, undo, and ending — Second Thoughts (undo ×1), What If? (undo ×3), On the Edge (any stat ≤10), Silver Tongue / High Roller / Iron Will (Allies/Fortune/Nerve ≥85), Untouchable (finish with all stats ≥70), Collector (5 endings). Toast + stat-up sting on unlock.
+- **Fairmath:** `fairDelta(before, d)`: gains scale with headroom `(100-before)`, losses scale with what remains `before`. At 50, ±12fm ≈ ±6 flat; at 90, +12fm ≈ +1; at 10, −12fm ≈ −1. Live on 2 Diver event options; `effects` stays flat everywhere else.
+- **Preview chips:** `previewHtml(opt)` renders direction-only ▲/▼ chips per affected stat (`~` prefix = fairmath), no numbers.
 
 **Story data format** (per scenario): `chapters[]` of `{id,name,narration,vignette,choices:[{id,lead,options:[{id,text,req?,effects,flags,result}]}],events:[...]}`; final chapter `{id:'epilogue', endings:[{id,title,rank,when(state),text}]}`. Endings evaluated in order; first `when()` true wins (tragic last as default).
 
@@ -85,3 +90,7 @@ Each playable chapter: narration (~90–130 words, second person, cinematic), 2�
 4. AI mode ON with network blocked → all vignettes fall back to authored text, no errors.
 5. Screenshot `assets/screenshot.png` from a real mid-story frame (narration + choices visible), 1280×800.
 6. `node --check` on extracted script; mobile viewport 390px smoke test.
+7. Undo: pick a choice, Undo, assert stats/flags/history/chapter identical to pre-choice snapshot; Undo button disables at empty stack; 3 undos unlock What If?.
+8. Checkpoints: advance a chapter, quit, assert a checkpoint button appears; restore it, assert chapter/stats match.
+9. Fairmath: unit-check `fairDelta(50,12)=6`, `fairDelta(90,12)=1`, `fairDelta(10,-12)=-1`, `fairDelta(50,-12)=-6`.
+10. Achievements: force stats to thresholds, assert unlocks persist in `yla_interactive_achievements_v1`; reset clears checkpoints + achievements.
