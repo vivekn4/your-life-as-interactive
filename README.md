@@ -14,6 +14,11 @@ A branching-narrative browser game that turns the "Your Life As" second-person s
 - **10 distinct endings** — triumphant, bittersweet, and tragic fates per scenario, earned by *your* play, not picked from a list
 - **BitLife-style systems** — visible stat bars, random life events between chapters, risk/reward tradeoffs
 - **Endings gallery** — collect every fate across lives; progress auto-saves to localStorage with mid-life resume
+- **↩ Undo** — rewind your last choice (up to 10 steps back) and live the road not taken — snapshots restore stats, flags, and history exactly
+- **Rotating checkpoints** — the last 3 chapter starts (plus every Save & Quit) are kept as one-tap restore points on the menu
+- **🏅 Achievements** — 8 unlockables: Second Thoughts, What If?, On the Edge, Silver Tongue, High Roller, Iron Will, Untouchable, Collector
+- **Fairmath stat changes** — opt-in `fm` effects scale with headroom: the same choice matters less at the top of a stat and more at the bottom (no more 0↔100 ping-pong)
+- **Choice previews** — every option shows direction-only stat hints (▲/▼, `~` = fairmath) so choices feel informed without spoiling numbers
 - **🤖 AI Storyteller (optional)** — when enabled, a free AI narrator (Puter.js — no key, no account, no backend) weaves one-line vignettes from *your actual choices*. The hand-authored story graph is the backbone: the game works fully offline, and every AI line falls back silently to written prose on any failure. The AI never changes plot, stats, or endings.
 - **Maximalist VN presentation** — canvas particle VFX, chapter-transition bursts, ending particle rain, film grain + vignette, fully synthesized WebAudio SFX (zero audio files), mobile-friendly
 
@@ -34,6 +39,7 @@ Vanilla JS, single `index.html`, zero dependencies, zero build step. Saves in `l
 - Headless-Chromium playthrough: full Deep-Sea Diver run to the "Legend of the Rigs" ending — stats changed, ending unlocked in gallery, save/resume verified, 44/44 DOM ids resolve, zero console errors
 - Knight + Idol smoke runs (3 choices each), 390px mobile overflow check, AI-offline fallback check (blocked network → authored prose, no errors)
 - Story-data validation: every choice option carries a consequence (stat change and/or flag), every ending reachable, epilogue catch-alls verified
+- Undo/checkpoint/achievement/fairmath QA (headless Chromium, 2026-10-14): 18/18 checks pass — undo restores exact pre-choice state, 3 undos unlock Second Thoughts + What If?, chapter-II checkpoint restore works, Allies 85 unlocks Silver Tongue, full Diver auto-playthrough reaches an ending recorded in the gallery, zero console/page errors
 
 ## 📄 License
 
